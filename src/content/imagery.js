@@ -13,6 +13,9 @@
   const IMAGE_TIMEOUT_MS = 10000;
   const VISIBILITY_RETRIES = 4;
   const VISIBILITY_RETRY_MS = 700;
+  const LIGHT_PIXEL_LUMA = 0.5;
+  const MIN_LIGHT_SHARE = 0.25;
+  const MIN_LIGHT_SHARE_ICON = 0.08;
   const SKIP_DARK_PHOTO_BELOW = 0.22;
   const SKIP_DARK_GRAPHIC_BELOW = 0.18;
 
@@ -91,7 +94,16 @@
     let kind = 'photo';
     if (opaque < 0.98) kind = 'icon';
     else if (seen.size <= 32 || midShare < 0.18) kind = 'graphic';
-    return { kind, colors: seen.size, midShare, opaque, meanLum: lumSum / Math.max(1, total - transparent) };
+    let lightPixels = 0;
+    for (let i = 0; i < data.length; i += 4) {
+      if (data[i + 3] < 26) continue;
+      if ((LUMA[0] * data[i] + LUMA[1] * data[i + 1] + LUMA[2] * data[i + 2]) / 255 > LIGHT_PIXEL_LUMA) lightPixels++;
+    }
+    const lightShare = lightPixels / Math.max(1, total - transparent);
+    return {
+      kind, colors: seen.size, midShare, opaque, lightShare,
+      meanLum: lumSum / Math.max(1, total - transparent),
+    };
   }
 
   function toneMap(source, width, height, kind) {
@@ -278,6 +290,8 @@
       const info = classify(bitmap, naturalW, naturalH);
       const kind = soft ? 'icon' : info.kind;
       if (!soft) {
+        const minLight = info.kind === 'icon' ? MIN_LIGHT_SHARE_ICON : MIN_LIGHT_SHARE;
+        if (info.lightShare < minLight) return { kind: 'skip-dark', reason: 'already-dark' };
         if (info.kind === 'photo' && info.meanLum < SKIP_DARK_PHOTO_BELOW) return { kind: 'skip-dark', reason: 'already-dark' };
         if (info.kind !== 'photo' && info.meanLum < SKIP_DARK_GRAPHIC_BELOW) return { kind: 'skip-dark', reason: 'already-dark' };
       }

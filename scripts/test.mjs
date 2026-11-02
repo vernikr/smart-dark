@@ -89,6 +89,8 @@ async function main() {
   for (const [slug, expected, label] of [
     ['light', false, 'light page'],
     ['dark-attribute', true, 'data-theme dark page'],
+    ['dark-body-class', true, 'body.dark page'],
+    ['dark-painted', true, 'page whose dark canvas is painted by gradients'],
     ['dark-media', false, 'page with a dark hero only'],
   ]) {
     await setStorage({ darkSites: {}, imageSites: {} });
@@ -167,6 +169,31 @@ async function main() {
     }
   }
 
+  // 3b. a real YouTube page saved to disk: the site announces its dark theme only after the first paint
+  await setStorage({ darkSites: {}, imageSites: {} });
+  const yt = await context.newPage();
+  await yt.goto(`${base}/youtube/clip.html`, { waitUntil: 'domcontentloaded', timeout: 60000 }).catch(() => null);
+  if (yt.url().includes('youtube/clip.html')) {
+    const ytState = await waitFor(yt, () => {
+      const raw = document.documentElement.dataset.sdState;
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      return parsed.reason === 'declared-dark' ? parsed : null;
+    });
+    check('youtube: the dark theme announced on <html> is picked up', !!ytState && ytState.factoryDark === true, JSON.stringify(ytState));
+    check('youtube: no layer of our theme is painted over the page', !!ytState && ytState.dark === false, JSON.stringify(ytState));
+    const ytFilters = await yt.evaluate(() => {
+      const video = document.querySelector('video');
+      const player = document.querySelector('.html5-video-player');
+      return {
+        video: video ? getComputedStyle(video).filter : 'none',
+        player: player ? getComputedStyle(player).filter : 'none',
+      };
+    });
+    check('youtube: the clip is never inverted', ytFilters.video === 'none' && ytFilters.player === 'none', JSON.stringify(ytFilters));
+  }
+  await yt.close();
+
   // 4. image classes on the fixture
   await setStorage({ darkSites: {}, imageSites: {} });
   const images = await context.newPage();
@@ -201,6 +228,25 @@ async function main() {
   check('images: photo keeps midtone range', photo && photo.mean > 80 && photo.mean < 165, JSON.stringify(photo));
   check('images: diagram background moved into the dark band', graphic && graphic.mean < 70, JSON.stringify(graphic));
   check('images: icon transparency preserved', icon && icon.alpha === 0, JSON.stringify(icon));
+  const darkSkip = await images.evaluate(() => {
+    const img = Array.from(document.images).find((i) => (i.currentSrc || i.src).includes('dark-photo'));
+    return img ? { skip: img.dataset.sdSkip || '', done: img.dataset.sdDone || '', source: img.dataset.sdSource || '' } : null;
+  });
+  check('images: an already dark photo is left alone', !!darkSkip && darkSkip.skip === 'already-dark' && !darkSkip.source, JSON.stringify(darkSkip));
+
+  // 4b. a player that a site fix inverts must keep the clip un-inverted
+  await setStorage({ darkSites: { '127.0.0.1': true }, imageSites: {} });
+  const player = await context.newPage();
+  await player.goto(`${base}/video/`, { waitUntil: 'load' });
+  const playerState = await waitFor(player, () => (document.documentElement.dataset.sdState ? JSON.parse(document.documentElement.dataset.sdState) : null));
+  check('video: forced theme is applied', playerState && playerState.dark === true, JSON.stringify(playerState));
+  const filters = await player.evaluate(() => {
+    const wrapper = document.querySelector('.html5-video-player');
+    const video = document.querySelector('video');
+    return { player: getComputedStyle(wrapper).filter, video: getComputedStyle(video).filter };
+  });
+  check('video: an inverted player wrapper does not invert the clip', /invert/.test(filters.player) && filters.video === 'none', JSON.stringify(filters));
+  await player.close();
   await images.screenshot({ path: path.join(shots, '13-image-classes.png'), fullPage: true });
 
   // 5. toggles, persistence and popup on the light fixture

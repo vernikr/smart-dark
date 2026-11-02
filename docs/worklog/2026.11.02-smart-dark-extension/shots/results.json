@@ -15,6 +15,16 @@
     "detail": "{\"factoryDark\":true,\"detected\":true,\"dark\":false,\"reason\":\"declared-dark\",\"imageError\":null}"
   },
   {
+    "name": "detection: body.dark page",
+    "ok": true,
+    "detail": "{\"factoryDark\":true,\"detected\":true,\"dark\":false,\"reason\":\"declared-dark\",\"imageError\":null}"
+  },
+  {
+    "name": "detection: page whose dark canvas is painted by gradients",
+    "ok": true,
+    "detail": "{\"factoryDark\":true,\"detected\":true,\"dark\":false,\"reason\":\"measured-dark\",\"imageError\":null}"
+  },
+  {
     "name": "detection: page with a dark hero only",
     "ok": true,
     "detail": "{\"factoryDark\":false,\"detected\":true,\"dark\":true,\"reason\":\"measured-light\",\"imageError\":null}"
@@ -45,6 +55,21 @@
     "detail": "[]"
   },
   {
+    "name": "youtube: the dark theme announced on <html> is picked up",
+    "ok": true,
+    "detail": "{\"factoryDark\":true,\"detected\":true,\"dark\":false,\"reason\":\"declared-dark\",\"imageError\":null}"
+  },
+  {
+    "name": "youtube: no layer of our theme is painted over the page",
+    "ok": true,
+    "detail": "{\"factoryDark\":true,\"detected\":true,\"dark\":false,\"reason\":\"declared-dark\",\"imageError\":null}"
+  },
+  {
+    "name": "youtube: the clip is never inverted",
+    "ok": true,
+    "detail": "{\"video\":\"none\",\"player\":\"none\"}"
+  },
+  {
     "name": "images: photo, diagrams and logo classified separately",
     "ok": true,
     "detail": "[\"photo\",\"graphic\",\"graphic\",\"icon\"]"
@@ -68,6 +93,21 @@
     "name": "images: icon transparency preserved",
     "ok": true,
     "detail": "{\"kind\":\"icon\",\"mean\":74,\"alpha\":0}"
+  },
+  {
+    "name": "images: an already dark photo is left alone",
+    "ok": true,
+    "detail": "{\"skip\":\"already-dark\",\"done\":\"\",\"source\":\"\"}"
+  },
+  {
+    "name": "video: forced theme is applied",
+    "ok": true,
+    "detail": "{\"factoryDark\":false,\"detected\":true,\"dark\":true,\"reason\":\"measured-light\",\"imageError\":null}"
+  },
+  {
+    "name": "video: an inverted player wrapper does not invert the clip",
+    "ok": true,
+    "detail": "{\"player\":\"invert(1) hue-rotate(180deg)\",\"video\":\"none\"}"
   },
   {
     "name": "popup targets the active site",

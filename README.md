@@ -2,7 +2,7 @@
 
 Chrome/Edge extension that darkens light websites and darkens large images without losing their colours.
 
-- **Site layer.** Detects whether a site already ships a dark theme. Light sites are darkened automatically; sites that are dark already are left alone. The switch `Затемнять сайт <domain>` overrides the detection and is remembered per site.
+- **Site layer.** Detects whether a site already ships a dark theme — from what the site declares (`<html dark>`, `body.dark`, `data-theme`, `color-scheme`) and from what it paints (canvas and element colours, gradients, text). Light sites are darkened automatically; sites that are dark already are left alone. The switch `Затемнять сайт <domain>` overrides the detection and is remembered per site.
 - **Image layer.** Large images (article art, landing illustrations, diagrams, photos, transparent logos and icons) are re-toned so they sit on a dark page. Hue, saturation and transparency are preserved: light artwork is remapped into a dark band instead of being inverted or dimmed. The layer is **on for every site by default**; the switch `Затемнять изображения на <domain>` turns it off for one site and is remembered.
 
 Both switches live in the toolbar popup. There are no other settings.
@@ -21,12 +21,13 @@ Both switches live in the toolbar popup. There are no other settings.
 | Site with its own dark theme | Untouched, images can still be converted |
 | Switch `Затемнять сайт` turned on by hand | Site is darkened even if it has a dark theme |
 | Switch `Затемнять сайт` turned off by hand | Site stays light on later visits |
-| Any site, image switch untouched | Large raster images are re-toned; SVG art, already-dark images and small UI icons are skipped |
+| Any site, image switch untouched | Large raster images are re-toned; SVG art, already-dark images (less than a quarter of light pixels) and small UI icons are skipped |
+| Page with a video player | The clip, canvas, `picture` and iframes are excluded from image analysis, so a site fix that inverts the player wrapper cannot invert the video |
 | Any site, image switch off | The site renders original artwork; already converted images are restored in place |
 
 ## Where the logic comes from
 
-- Site recolouring uses the Dark Reader API runtime with the project's per-site fix lists, so page quality matches Dark Reader.
+- Site recolouring uses the Dark Reader API runtime with the project's per-site fix lists, so page quality matches Dark Reader. Fonts are switched to the system stack and system controls are themed, as Dark Reader does by default.
 - Image re-toning is implemented here: pixel classification into photo / graphic / icon, then a lightness remap in perceptual sRGB space that keeps hue and chroma, plus a hover-free swap of the rendered pixels.
 
 ## Development

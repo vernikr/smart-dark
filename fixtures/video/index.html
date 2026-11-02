@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><title>Video page that looks like YouTube</title>
+<style>
+/* the host page would never do this; it mimics a site fix that inverts the player wrapper */
+.html5-video-player--fixture{filter:invert(100%) hue-rotate(180deg)}
+html{background:#fff}
+body{font:16px/1.6 system-ui,sans-serif;margin:0;background:#fff;color:#0f0f0f}
+masthead{display:block;padding:12px 24px;border-bottom:1px solid #e5e5e5}
+.player{width:640px;height:360px;margin:24px auto;background:#000}
+.player video{width:100%;height:100%;display:block;object-fit:cover}
+.side{max-width:640px;margin:0 auto 48px;padding:0 24px}
+</style>
+</head><body>
+<masthead>Player fixture</masthead>
+<div class="html5-video-player html5-video-player--fixture"><video id="clip" loop muted playsinline poster="../images/photo.jpg"></video></div>
+<section class="side"><h1>A page with a video player</h1><p>The player container is inverted by a site fix, so the clip must be protected from that filter.</p></section>
+</body></html>

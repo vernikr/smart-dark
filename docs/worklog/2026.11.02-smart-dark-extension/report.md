@@ -22,7 +22,7 @@ Reference points: Dark Reader for page recolouring quality, DarkPage for image h
 
 ## Verification
 
-`npm test` runs 19 end-to-end checks in Chromium against local fixtures and the reference page `kiro.dev/blog/software-factory-stability/`: detection variants, live native-dark page, image classes with pixel statistics, switch persistence and popup wiring. Screenshots land in `shots/`.
+`npm test` runs 32 end-to-end checks in Chromium against local fixtures and the reference page `kiro.dev/blog/software-factory-stability/`: detection variants, live native-dark page, image classes with pixel statistics, switch persistence and popup wiring. Screenshots land in `shots/`.
 
 Tone curves were prototyped in Python against real artwork before porting, which caught two defects: a linear-space/perc-heights confusion that crushed dark text, and a hue-scaling branch that turned white logos grey.
 
@@ -54,3 +54,15 @@ The Dark Reader checkout (source of the fix lists) is not committed: `dist-templ
 - Images whose opacity animates in were dropped as "invisible"; now retried a few times.
 - Site re-renders could restart conversion forever; each element/source pair is now claimed once.
 - Slow image loads could stall the queue; each image is bounded by a timeout.
+
+## 1.2.0 follow-up
+
+| Report | Cause | Fix |
+| --- | --- | --- |
+| Icon glyph floated inside the tile with a visible margin | The SVG was rasterised with its own padding | `scripts/make-icons.mjs` crops the rendered glyph to `path.getBBox()` (+2% breathing room) before resizing, so the moon fills 16–128 px tiles |
+| Popup could not be rounded | Chrome draws the native action popup window itself; its shape is not stylable, and an inner `border-radius` merely double-rounds the corners with a seam | The popup stays the plain toolbar popup. No in-page panel, no extra surface to maintain |
+| Already dark images were converted again | Only the presence of light pixels was checked, never their share | `lightShare` (pixels with luma > 0.5 on a 48×48 grid) skips frames below 25% (icons 8%), reason `already-dark` |
+| YouTube seen as a light site while its system theme is dark | The `<html>` tag carries a bare `dark` attribute (plus `darker-dark-theme`), which only `body`/`data-theme` checks missed; YouTube adds it after the first paint, and the early measured verdict `measured-light` was never revisited | Declared-signal table covers classes, `data-*`, `inert` attributes like `dark`/`night`, `color-scheme`; `render()` re-detects each time and a declared verdict always replaces a measured one; measurement itself is now a page-wide survey with a canvas vote |
+| Turning the site switch on inverted the video | With the theme forced, Dark Reader applies the YouTube fix `INVERT .html5-video-player`, generating `.html5-video-player > * { filter: invert() }` — that child is the `<video>` | `ignoreImageAnalysis` always includes `video, canvas, picture, iframe`, merged with the per-site list; verified by a fixture where the player wrapper is inverted on purpose |
+
+Detection thresholds after the rewrite: the survey votes per sampled point and per text element, the page canvas (html/body paint) decides the bar — light canvas requires ≥75% dark votes, dark canvas ≥34%, no canvas ≥55%. Fixtures `fixtures/dark-body-class/`, `fixtures/dark-painted/` and `fixtures/youtube/clip.html` (a saved YouTube watch page, markup only) lock the three cases down.

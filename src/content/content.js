@@ -21,7 +21,8 @@
     contrast: 100,
     grayscale: 0,
     sepia: 0,
-    useFont: false,
+    useFont: true,
+    fontFamily: 'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif',
     textStroke: 0,
     darkSchemeBackgroundColor: '#181a1b',
     darkSchemeTextColor: '#e8e6e3',
@@ -29,14 +30,19 @@
     lightSchemeTextColor: '#181a1b',
     scrollbarColor: 'auto',
     selectionColor: 'auto',
-    styleSystemControls: false,
+    styleSystemControls: true,
+    // Irreplaceable media: the theme must never paint over video, canvas or the player chrome.
+    ignoreImageAnalysis: ['video', 'canvas', 'picture', 'iframe'],
   };
+
+  const MEDIA_SAFE = THEME.ignoreImageAnalysis;
 
   function applyTheme(on) {
     if (!window.DarkReader || state.darkApplied === on) return;
     try {
       if (on) {
-        window.DarkReader.enable(THEME, { invert: state.fixes.invert, ignoreImageAnalysis: state.fixes.ignore });
+        const ignore = [...MEDIA_SAFE, ...state.fixes.ignore];
+        window.DarkReader.enable(THEME, { invert: state.fixes.invert, ignoreImageAnalysis: ignore });
       } else {
         window.DarkReader.disable();
       }
@@ -88,9 +94,13 @@
     };
   }
 
+  /* Sites announce their theme late (YouTube sets <html dark> after its first paint), so declared signals always
+     win over the measured ones, and a measured verdict is only trusted until the page says something itself. */
   function detect() {
     const result = window.WDDetect.detect();
-    if (result.reason !== 'no-body') {
+    if (result.reason === 'no-body') return result.dark;
+    const declared = result.reason.indexOf('declared-') === 0;
+    if (!state.detected || declared) {
       state.factoryDark = result.dark;
       state.reason = result.reason;
       state.detected = true;
@@ -100,9 +110,9 @@
 
   function render() {
     return getSettings().then((settings) => {
+      detect();
       const forced = window.WD.isDarkSite(settings, key);
-      let factoryDark = state.factoryDark;
-      if (factoryDark === null) factoryDark = detect();
+      const factoryDark = state.factoryDark;
 
       const wantTheme = forced === true ? true : forced === false ? false : factoryDark !== true;
       applyTheme(wantTheme);
@@ -180,6 +190,7 @@
       const settle = () => render().then(() => {
         setTimeout(() => render(), 400);
         setTimeout(() => render(), 1500);
+        setTimeout(() => render(), 3000);
       });
       if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', settle, { once: true });
       else settle();

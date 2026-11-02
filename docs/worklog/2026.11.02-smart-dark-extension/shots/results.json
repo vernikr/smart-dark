@@ -47,7 +47,7 @@
   {
     "name": "live: article diagrams converted on a native dark site",
     "ok": true,
-    "detail": "{\"started\":43,\"converted\":1,\"reasons\":{\"unprocessed\":42}}"
+    "detail": "{\"started\":55,\"converted\":1,\"reasons\":{\"unprocessed\":54}}"
   },
   {
     "name": "live: no image left in a failed state",
@@ -67,7 +67,12 @@
   {
     "name": "youtube: the clip is never inverted",
     "ok": true,
-    "detail": "{\"video\":\"none\",\"player\":\"none\"}"
+    "detail": "{\"video\":\"none\",\"player\":\"none\",\"chain\":0}"
+  },
+  {
+    "name": "youtube: no container filter reaches the video",
+    "ok": true,
+    "detail": "{\"video\":\"none\",\"player\":\"none\",\"chain\":0}"
   },
   {
     "name": "images: photo, diagrams and logo classified separately",

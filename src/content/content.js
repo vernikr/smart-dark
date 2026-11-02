@@ -44,13 +44,22 @@
     return state.fixes;
   }
 
+  const MEDIA_CONTAINER = /(^|[\s.#_-])(video|player|media)([\s.#_:-]|$)/i;
+
+  /* Inverting a player wrapper flips the clip with it, so those fixes are dropped once the page has a video. */
+  function invertSelectors() {
+    const hasVideo = !!document.querySelector('video');
+    if (!hasVideo) return state.fixes.invert;
+    return state.fixes.invert.filter((selector) => !MEDIA_CONTAINER.test(selector));
+  }
+
   function applyTheme(on) {
     if (!window.DarkReader || state.darkApplied === on) return;
     try {
       if (on) {
         const fixes = fixesFor(state.factoryDark);
         const ignore = [...MEDIA_SAFE, ...fixes.ignore];
-        window.DarkReader.enable(THEME, { invert: fixes.invert, ignoreImageAnalysis: ignore });
+        window.DarkReader.enable(THEME, { invert: invertSelectors(), ignoreImageAnalysis: ignore });
       } else {
         window.DarkReader.disable();
       }
@@ -201,8 +210,23 @@
         setTimeout(() => render(), 1500);
         setTimeout(() => render(), 3000);
       });
-      if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', settle, { once: true });
-      else settle();
+      const watchAnnouncements = () => {
+        const seen = { scheme: state.reason, video: !!document.querySelector('video') };
+        const review = () => {
+          const scheme = window.WDDetect.detect().reason;
+          const video = !!document.querySelector('video');
+          if (scheme === seen.scheme && video === seen.video) return;
+          seen.scheme = scheme;
+          seen.video = video;
+          render();
+        };
+        const observer = new MutationObserver(review);
+        const options = { attributes: true, attributeFilter: ['class', 'dark', 'data-theme', 'data-mode', 'data-color-mode', 'data-scheme'] };
+        [document.documentElement, document.body].forEach((element) => element && observer.observe(element, options));
+        observer.observe(document.documentElement, { childList: true, subtree: true });
+      };
+      if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => { settle(); watchAnnouncements(); }, { once: true });
+      else { settle(); watchAnnouncements(); }
       window.addEventListener('load', () => {
         if (!state.detected) render();
       }, { once: true });

@@ -263,7 +263,6 @@
       if (!img.isConnected) return;
       const url = img.currentSrc || img.src;
       if (!url || url.startsWith('data:image/svg') || /\.svg(\?|#|$)/i.test(url)) return;
-      if (!this.isLarge(img)) return;
       // Images that fade in or mount late are retried shortly instead of being dropped.
       if (!this.isVisible(img)) {
         const attempts = Number(img.dataset.sdAttempts || 0);
@@ -273,6 +272,7 @@
         setTimeout(() => this.enqueue(img), VISIBILITY_RETRY_MS);
         return;
       }
+      if (!this.isLarge(img)) return;
       if (!this.claim(img, url)) return;
       if (this.matches(img, this.selectors.ignore)) { img.dataset.sdSkip = 'ignore'; return; }
 

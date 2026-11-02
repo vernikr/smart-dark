@@ -187,12 +187,18 @@ async function main() {
     const ytFilters = await yt.evaluate(() => {
       const video = document.querySelector('video');
       const player = document.querySelector('.html5-video-player');
+      let chain = 0;
+      for (let node = video; node && node !== document.documentElement; node = node.parentElement) {
+        if (getComputedStyle(node).filter !== 'none') chain++;
+      }
       return {
         video: video ? getComputedStyle(video).filter : 'none',
         player: player ? getComputedStyle(player).filter : 'none',
+        chain,
       };
     });
     check('youtube: the clip is never inverted', ytFilters.video === 'none' && ytFilters.player === 'none', JSON.stringify(ytFilters));
+    check('youtube: no container filter reaches the video', ytFilters.chain === 0, JSON.stringify(ytFilters));
   }
   await yt.close();
 

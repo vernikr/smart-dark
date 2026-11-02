@@ -225,10 +225,12 @@
       return (w >= MIN_WIDTH && h >= MIN_HEIGHT) || w * h >= MIN_AREA;
     }
 
+    /* Faded-out candidates still count: reveal animations start at opacity 0, and waiting for them let the light
+       original show first. A hidden or unlaid-out element is what must be postponed, not a transparent one. */
     isVisible(el) {
       if (!el.getClientRects().length && !fallbackBox(el)) return false;
       const style = getComputedStyle(el);
-      return style.visibility !== 'hidden' && Number(style.opacity) > 0.05;
+      return style.visibility !== 'hidden' && style.display !== 'none';
     }
 
     enqueue(img) {
@@ -277,7 +279,7 @@
       // Images that fade in or mount late are retried shortly instead of being dropped.
       if (!this.isVisible(img)) {
         const attempts = Number(img.dataset.sdAttempts || 0);
-        if (attempts >= VISIBILITY_RETRIES) return;
+        if (attempts >= VISIBILITY_RETRIES) { img.dataset.sdSkip = 'not-visible'; return; }
         img.dataset.sdAttempts = String(attempts + 1);
         delete img.dataset.sdQueued;
         setTimeout(() => this.enqueue(img), VISIBILITY_RETRY_MS);

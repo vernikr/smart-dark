@@ -47,7 +47,7 @@
   {
     "name": "live: article diagrams converted on a native dark site",
     "ok": true,
-    "detail": "{\"started\":41,\"converted\":4,\"reasons\":{\"small\":10,\"unprocessed\":16,\"vector\":11}}"
+    "detail": "{\"started\":40,\"converted\":4,\"reasons\":{\"small\":10,\"unprocessed\":15,\"vector\":11}}"
   },
   {
     "name": "live: no image left in a failed state",

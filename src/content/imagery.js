@@ -21,7 +21,7 @@
   const SKIP_DARK_PHOTO_BELOW = 0.22;
   const SKIP_DARK_GRAPHIC_BELOW = 0.18;
   // A flip that leaves this much more of the frame light than before is not an improvement, it is a mess.
-  const FLIP_LIGHT_WORSENS = 0.15;
+  const FLIP_LIGHT_WORSENS = 0.05;
   // A flip that keeps less than this share of the original edge contrast has destroyed the drawing.
   const FLIP_CONTRAST_FLOOR = 0.45;
 

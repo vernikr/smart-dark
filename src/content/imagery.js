@@ -20,11 +20,18 @@
   const MIN_LIGHT_SHARE_ICON = 0.08;
   const SKIP_DARK_PHOTO_BELOW = 0.22;
   const SKIP_DARK_GRAPHIC_BELOW = 0.18;
+  // A flip that leaves this much more of the frame light than before is not an improvement, it is a mess.
+  const FLIP_LIGHT_WORSENS = 0.15;
+  // A flip that keeps less than this share of the original edge contrast has destroyed the drawing.
+  const FLIP_CONTRAST_FLOOR = 0.45;
 
+  /* `dim` is not a class of picture, it is the verdict on one: the picture is dark enough or detailed enough that
+     inverting it would make it worse, so it gets the photographic curve — darkened, never inverted. */
   const CURVES = {
     icon: { flip: false, floor: 0.300, ceil: 0.880, sat: 1.10 },
     graphic: { flip: true, floor: 0.135, ceil: 0.880, sat: 1.20 },
     photo: { flip: false, floor: 0.060, ceil: 0.640, sat: 1.06 },
+    dim: { flip: false, floor: 0.060, ceil: 0.640, sat: 1.06 },
   };
 
   const srgbToLin = new Float32Array(256);
@@ -196,6 +203,72 @@
     return rect.width >= MIN_WIDTH && rect.height >= MIN_HEIGHT ? rect : null;
   }
 
+  /* Lazy loaders park a 1×1 transparent GIF in `src` and keep the real frame in a `<source srcset>`. Reading the
+     element then means reading the placeholder: the picture came out as a one-pixel "graphic" and the article showed
+     nothing. The frame that will actually be painted is resolved here instead. */
+  const PLACEHOLDER_PX = 4;
+
+  function srcsetFrames(value) {
+    return String(value || '')
+      .split(',')
+      .map((part) => part.trim().split(/\s+/)[0])
+      .filter(Boolean);
+  }
+
+  function pictureFrames(img) {
+    const picture = img.parentElement && img.parentElement.tagName === 'PICTURE' ? img.parentElement : null;
+    if (!picture) return [];
+    return [...picture.querySelectorAll('source')].flatMap((source) => srcsetFrames(source.getAttribute('srcset')));
+  }
+
+  /* Sources that were emptied by an earlier swap are still listed in the parked attribute. */
+  function parkedFrames(img) {
+    const parked = (() => {
+      try { return JSON.parse(img.dataset[SD_PARKED] || 'null'); } catch (err) { return null; }
+    })();
+    if (!Array.isArray(parked)) return [];
+    return parked.filter(Boolean).flatMap(srcsetFrames);
+  }
+
+  function isPlaceholder(bitmap) {
+    const w = bitmap.width || bitmap.naturalWidth || 0;
+    const h = bitmap.height || bitmap.naturalHeight || 0;
+    return w > 0 && h > 0 && w <= PLACEHOLDER_PX && h <= PLACEHOLDER_PX;
+  }
+
+  function absolute(url) {
+    try { return new URL(url, location.href).href; } catch (err) { return url; }
+  }
+
+  /* Mean and vertical gradient of a thumbnail-sized copy: the cheapest way to ask "did this get lighter?" */
+  function thumbnailStats(source) {
+    const w = Math.min(160, source.width || 160);
+    const h = Math.max(1, Math.round(w * (source.height || 1) / (source.width || 1)));
+    const canvas = canvasOf(w, h);
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    ctx.drawImage(source, 0, 0, w, h);
+    const data = ctx.getImageData(0, 0, w, h).data;
+    const luma = new Float32Array(w * h);
+    let sum = 0;
+    let light = 0;
+    for (let i = 0, p = 0; i < data.length; i += 4, p++) {
+      const l = (LUMA[0] * data[i] + LUMA[1] * data[i + 1] + LUMA[2] * data[i + 2]) / 255;
+      luma[p] = l;
+      sum += l;
+      if (l > LIGHT_PIXEL_LUMA) light++;
+    }
+    let gradient = 0;
+    let pairs = 0;
+    for (let y = 0; y < h; y++) {
+      const row = y * w;
+      for (let x = 1; x < w; x++) {
+        gradient += Math.abs(luma[row + x] - luma[row + x - 1]);
+        pairs++;
+      }
+    }
+    return { mean: sum / Math.max(1, w * h), light: light / Math.max(1, w * h), gradient: gradient / Math.max(1, pairs) };
+  }
+
   function toObjectURL(canvas) {
     return new Promise((resolve) => {
       if (typeof canvas.convertToBlob === 'function') {
@@ -303,20 +376,30 @@
         return;
       }
       if (!this.isLarge(img) && !fallbackBox(img)) { img.dataset.sdSkip = 'small'; return; }
-      if (!this.claim(img, url)) { if (!img.dataset.sdDone) img.dataset.sdSkip = 'claimed'; return; }
       if (this.matches(img, this.selectors.ignore)) { img.dataset.sdSkip = 'ignore'; return; }
 
       // Lazy loaders hand out private object URLs that cannot be fetched again; the element itself is then the source.
-      const element = url.startsWith('blob:') ? img : null;
-      if (element && !(img.complete && img.naturalWidth)) { img.dataset.sdSkip = 'not-loaded'; return; }
+      let element = url.startsWith('blob:') ? img : null;
+      let frameUrl = url;
+      if (!element && img.complete && img.naturalWidth && isPlaceholder(img)) {
+        // The element holds the 1×1 stand-in, so the picture has to be read from the frame the browser will paint.
+        const candidates = [...parkedFrames(img), ...pictureFrames(img), ...srcsetFrames(img.getAttribute('srcset'))]
+          .map(absolute)
+          .filter((candidate) => candidate && candidate !== url && !candidate.startsWith('data:'));
+        if (!candidates.length) { img.dataset.sdSkip = 'placeholder'; return; }
+        frameUrl = candidates[candidates.length - 1];
+      } else if (element && isPlaceholder(img)) {
+        return { reason: 'placeholder' };
+      }
+      if (!this.claim(img, frameUrl)) { if (!img.dataset.sdDone) img.dataset.sdSkip = 'claimed'; return; }
 
       const soft = this.matches(img, this.selectors.invert);
       // Faded out while the replacement is prepared, so a fast scroll never shows the light original.
       img.dataset.sdPending = '1';
-      const key = `${url}|${soft ? 'soft' : 'auto'}`;
+      const key = `${frameUrl}|${soft ? 'soft' : 'auto'}`;
       let entry = this.cache.get(key);
       if (!entry) {
-        entry = await this.build(url, soft, element);
+        entry = await this.build(frameUrl, soft, element);
         this.cache.set(key, entry);
       }
       if (!entry || !entry.url) {
@@ -343,6 +426,10 @@
       } catch (err) {
         return { reason: 'cross-origin' };
       }
+      if (isPlaceholder(bitmap)) {
+        // Deliberately unsupported: a real frame of this picture was tried and there is nothing to read.
+        return { kind: 'skip-dark', reason: 'placeholder' };
+      }
       const naturalW = bitmap.width || bitmap.naturalWidth;
       const naturalH = bitmap.height || bitmap.naturalHeight;
       if (!naturalW || !naturalH) return { reason: 'empty' };
@@ -359,10 +446,40 @@
       const scale = Math.min(1, MAX_SIDE / Math.max(naturalW, naturalH));
       const w = Math.max(1, Math.round(naturalW * scale));
       const h = Math.max(1, Math.round(naturalH * scale));
-      const canvas = toneMap(bitmap, naturalW, naturalH, kind);
+      const before = soft ? null : thumbnailStats(bitmap);
+      let finalKind = kind;
+      let canvas = toneMap(bitmap, naturalW, naturalH, finalKind);
+      let dimmed = null;
+      if (!soft) {
+        // A polarity flip turns dark art with bright lettering into a light page with dark lettering — the exact
+        // result the user asked to avoid. A flattening flip (light ink on a dark plate) loses most of its edge
+        // contrast and cannot be read at all. Such a picture is dimmed like a photograph instead.
+        if (finalKind === 'graphic') {
+          const flipped = thumbnailStats(canvas);
+          const lighter = flipped.light - before.light >= FLIP_LIGHT_WORSENS;
+          const flattened = flipped.gradient < before.gradient * FLIP_CONTRAST_FLOOR;
+          if (lighter || flattened) {
+            finalKind = 'dim';
+            dimmed = thumbnailStats(toneMap(bitmap, naturalW, naturalH, 'photo'));
+            if (dimmed.light > before.light + FLIP_LIGHT_WORSENS) {
+              return { kind: 'skip-dark', reason: 'already-dark' };
+            }
+            canvas = toneMap(bitmap, naturalW, naturalH, 'photo');
+          }
+        }
+        // A flip that keeps almost none of the original edge contrast (a small low-contrast illustration) reads as
+        // a flat plate. Keep the dim instead when the flip destroys detail the eye needs.
+        if (finalKind !== 'dim') {
+          const result = thumbnailStats(canvas);
+          if (result.gradient < before.gradient * FLIP_CONTRAST_FLOOR) {
+            finalKind = 'dim';
+            canvas = toneMap(bitmap, naturalW, naturalH, 'photo');
+          }
+        }
+      }
       const out = scale < 1 ? this.downscale(canvas, w, h) : canvas;
       const objectURL = await toObjectURL(out);
-      return { url: objectURL, kind, info };
+      return { url: objectURL, kind: soft ? 'icon' : (finalKind === 'dim' ? 'dim' : finalKind), info };
     }
 
     downscale(canvas, w, h) {

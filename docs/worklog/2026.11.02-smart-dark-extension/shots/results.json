@@ -47,7 +47,7 @@
   {
     "name": "live: article diagrams converted on a native dark site",
     "ok": true,
-    "detail": "{\"started\":43,\"converted\":4,\"reasons\":{\"unprocessed\":18,\"small\":10,\"vector\":11}}"
+    "detail": "{\"started\":41,\"converted\":4,\"reasons\":{\"small\":10,\"unprocessed\":16,\"vector\":11}}"
   },
   {
     "name": "live: no image left in a failed state",
@@ -133,6 +133,26 @@
     "name": "images: hide puts the <source srcset> back",
     "ok": true,
     "detail": "{\"srcset\":true,\"src\":\"/images/banner.png\",\"marker\":false}"
+  },
+  {
+    "name": "images: a lazy 1x1 stand-in is not converted — the real frame is",
+    "ok": true,
+    "detail": "{\"state\":\"photo\",\"natural\":\"1200x801\",\"parked\":true,\"size\":64}"
+  },
+  {
+    "name": "images: dark art with light lettering is dimmed, not inverted",
+    "ok": true,
+    "detail": "{\"state\":\"dim\",\"kind\":\"dim\",\"mean\":0.22160311633987487,\"light\":0.14479166666666668}"
+  },
+  {
+    "name": "images: a flat dark strip is never inverted",
+    "ok": true,
+    "detail": "{\"state\":\"skip:already-dark\",\"kind\":\"\",\"mean\":0.09570252614378896,\"light\":0}"
+  },
+  {
+    "name": "images: a bright control photograph is still darkened",
+    "ok": true,
+    "detail": "{\"state\":\"photo\",\"kind\":\"photo\",\"mean\":0.37616138153594586,\"light\":0.2891666666666667}"
   },
   {
     "name": "video: forced theme is applied",

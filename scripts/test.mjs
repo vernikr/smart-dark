@@ -341,6 +341,47 @@ async function main() {
   check('images: hide puts the <source srcset> back', picRestored.srcset && picRestored.src === '/images/banner.png' && !picRestored.marker, JSON.stringify(picRestored));
   await picPage.close();
 
+  // 4a3. lazy frames: the stand-in is not the picture, and dark art is not turned inside out
+  const lazy = await context.newPage();
+  await lazy.goto(`${base}/images/lazy.html`, { waitUntil: 'load' });
+  await scrollThrough(lazy);
+  const lazyRows = await waitFor(lazy, () => {
+    const pick = (sel) => document.querySelector(sel);
+    const lazyImg = pick('img[data-lazy]');
+    const dark = pick('img[data-dark-art]');
+    const strip = pick('img[data-strip]');
+    const control = pick('img[data-control]');
+    const state = (img) => (img.dataset.sdDone || (img.dataset.sdSkip ? `skip:${img.dataset.sdSkip}` : ''));
+    if (!state(lazyImg) || !state(dark) || !state(strip) || !state(control)) return null;
+    const lum = (img) => {
+      const canvas = document.createElement('canvas');
+      canvas.width = 120;
+      canvas.height = Math.max(1, Math.round(120 * img.naturalHeight / img.naturalWidth));
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      const data = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+      let sum = 0;
+      let light = 0;
+      for (let i = 0; i < data.length; i += 4) {
+        const l = (0.2126 * data[i] + 0.7152 * data[i + 1] + 0.0722 * data[i + 2]) / 255;
+        sum += l;
+        if (l > 0.5) light++;
+      }
+      return { mean: sum / (data.length / 4), light: light / (data.length / 4) };
+    };
+    return {
+      lazy: { state: state(lazyImg), natural: `${lazyImg.naturalWidth}x${lazyImg.naturalHeight}`, parked: !!lazyImg.dataset.sdSources, size: lazyImg.src.length },
+      dark: { state: state(dark), kind: dark.dataset.sdDone || '', ...lum(dark) },
+      strip: { state: state(strip), kind: strip.dataset.sdDone || '', ...lum(strip) },
+      control: { state: state(control), kind: control.dataset.sdDone || '', ...lum(control) },
+    };
+  }, 30000);
+  check('images: a lazy 1x1 stand-in is not converted — the real frame is', !!lazyRows && lazyRows.lazy.state === 'photo' && lazyRows.lazy.natural !== '1x1' && lazyRows.lazy.parked, JSON.stringify(lazyRows && lazyRows.lazy));
+  check('images: dark art with light lettering is dimmed, not inverted', !!lazyRows && lazyRows.dark.state === 'dim' && lazyRows.dark.mean < 0.35, JSON.stringify(lazyRows && lazyRows.dark));
+  check('images: a flat dark strip is never inverted', !!lazyRows && (lazyRows.strip.state === 'dim' || lazyRows.strip.state === 'skip:already-dark'), JSON.stringify(lazyRows && lazyRows.strip));
+  check('images: a bright control photograph is still darkened', !!lazyRows && lazyRows.control.kind === 'photo' && lazyRows.control.mean < 0.45, JSON.stringify(lazyRows && lazyRows.control));
+  await lazy.close();
+
   // 4b. a player that a site fix inverts must keep the clip un-inverted
   await setStorage({ darkSites: { '127.0.0.1': true }, imageSites: {} });
   const player = await context.newPage();

@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Lazy frames and dark art</title>
+  <style>
+    body { margin: 0; background: #fff; color: #14161a; font: 16px/1.6 system-ui, sans-serif; }
+    main { max-width: 900px; margin: 0 auto; padding: 48px 24px 96px; }
+    figure { margin: 0 0 40px; }
+    picture img { width: 100%; height: auto; display: block; }
+    .strip { width: 100%; display: block; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Lazy frames and dark art</h1>
+
+    <!-- A lazy loader parks a 1x1 stand-in in src and keeps the real frame in the <source>. The picture must be
+         read from the frame, never from the stand-in — the stand-in used to be converted into a one-pixel "graphic". -->
+    <figure>
+      <picture>
+        <source srcset="photo.jpg" type="image/jpeg">
+        <img src="placeholder.gif" alt="Photo behind a lazy placeholder" data-lazy="1">
+      </picture>
+    </figure>
+
+    <!-- Dark art with light lettering: inverting it yields a light page with dark lettering, which is worse. -->
+    <figure>
+      <img src="poster-dark.png" alt="Dark poster with light lettering" data-dark-art="1">
+    </figure>
+
+    <!-- A thin dark strip with almost no contrast: a flip flattens it into a plate. -->
+    <figure>
+      <img src="strip-dark.png" alt="Low contrast dark strip" class="strip" data-strip="1">
+    </figure>
+
+    <!-- The control: a bright photograph must still be darkened. -->
+    <figure>
+      <img src="photo.jpg" alt="Photo" data-control="1">
+    </figure>
+  </main>
+</body>
+</html>

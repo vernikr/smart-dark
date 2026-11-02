@@ -47,7 +47,7 @@
   {
     "name": "live: article diagrams converted on a native dark site",
     "ok": true,
-    "detail": "{\"started\":41,\"converted\":4,\"reasons\":{\"small\":10,\"unprocessed\":16,\"vector\":11}}"
+    "detail": "{\"started\":43,\"converted\":4,\"reasons\":{\"unprocessed\":18,\"small\":10,\"vector\":11}}"
   },
   {
     "name": "live: no image left in a failed state",
@@ -113,6 +113,26 @@
     "name": "images: a permissive CDN is read without credentials",
     "ok": true,
     "detail": "{\"done\":\"graphic\",\"info\":\"graphic/18/0.34/1.00\"}"
+  },
+  {
+    "name": "images: a <picture> shows the dark frame, not the original source",
+    "ok": true,
+    "detail": "{\"done\":\"graphic\",\"shown\":\"blob\",\"parked\":\"[\\\"banner.png\\\"]\"}"
+  },
+  {
+    "name": "images: the picture is converted again once images are back on",
+    "ok": true,
+    "detail": "{\"locked\":true}"
+  },
+  {
+    "name": "images: a re-render that restores srcset does not bring the light original back",
+    "ok": true,
+    "detail": "{\"shown\":\"blob\",\"srcset\":false,\"sources\":0,\"fought\":true}"
+  },
+  {
+    "name": "images: hide puts the <source srcset> back",
+    "ok": true,
+    "detail": "{\"srcset\":true,\"src\":\"/images/banner.png\",\"marker\":false}"
   },
   {
     "name": "video: forced theme is applied",

@@ -22,7 +22,7 @@ Reference points: Dark Reader for page recolouring quality, DarkPage for image h
 
 ## Verification
 
-`npm test` runs 32 end-to-end checks in Chromium against local fixtures and the reference page `kiro.dev/blog/software-factory-stability/`: detection variants, live native-dark page, image classes with pixel statistics, switch persistence and popup wiring. Screenshots land in `shots/`.
+`npm test` runs 40 end-to-end checks in Chromium against local fixtures and the reference page `kiro.dev/blog/software-factory-stability/`: detection variants, live native-dark page, image classes with pixel statistics, switch persistence and popup wiring. Screenshots land in `shots/`.
 
 Tone curves were prototyped in Python against real artwork before porting, which caught two defects: a linear-space/perc-heights confusion that crushed dark text, and a hue-scaling branch that turned white logos grey.
 
@@ -93,6 +93,21 @@ Reported on habr.com: the photo with the gas tanks in the feed and both illustra
 | The runners illustration looks almost unchanged | Not a bug in this build: 79 colours and 47% midtones is a photograph by every measure, so the soft curve applies and the mean goes 0.672 → 0.361. Where it still reads light is the pale sky band — the soft curve never drives anything to black. Open question for the user: is that acceptable, or should photographs with a large flat light area get a stronger curve |
 
 Live ledger after the fix — feed: `35/1/{"small":28,"already-dark":6}` with `photo/132/0.48/1.00` on the tanks photo; article: `14/7/{"small":3,"already-dark":4}` with `graphic/45/0.25/1.00` on the header and `photo/79/0.47/1.00` on the runners. Screenshots: `docs/worklog/2026.11.02-smart-dark-extension/shots/` is unchanged for this round, the captures are in the user-facing comparison page.
+
+## 1.2.3 follow-up
+
+Reported on meduza.io: pictures are darkened for a moment and then look restored.
+
+| Report | Cause | Fix |
+| --- | --- | --- |
+| A darkened picture on meduza.io looks bright again | Every picture there is a responsive `<picture>`. The frame the browser paints is chosen by the `<source srcset>` children, and that choice outranks `img.src`. The swap put the dark PNG into `src`, the `<source>` still pointed at the bright original, so `currentSrc` never left the original and the tone-mapped frame was simply not displayed. The `data-sd-*` markers said `graphic`/`photo`, which is why it read as "darkened, then restored" rather than "never darkened" | The `<source>` children are emptied when the swap happens and their values are parked in `data-sd-sources`, so hiding images for the origin puts the page back exactly as it was. Confirmed on the live front page: converted pictures now report `currentSrc = blob:` instead of the original URL |
+| The same, on a framework re-render | After the swap a re-render can put `srcset` back on the element or on its `<source>` children, and either wins over our blob | A converted image is held, not silently overridden: a mutation that carries returning sources re-clears them, and only a genuinely new URL with no `<source>` present is handed back to the queue (paging recycles cards, so a new URL must still be converted) |
+
+Live after the fix — meduza front page: `16/5/{"already-dark":11}`, article: `15/5/{"small":2,"already-dark":8}`; every converted picture reports `currentSrc = blob:` and none of them has a live `<source srcset>`. Covered by two new checks in `npm test` (a `<picture>` fixture and a forced re-render that restores `srcset`); the suite is 40/40.
+
+## Known limits (1.2.3)
+
+- A `<picture>` whose `<source>` children are added *after* the swap and point at a *different* picture is treated as a re-render and cleared; the frame stays the dark one. Recycling that swaps the picture through `<source>` alone is not followed.
 
 ## Known limits (1.2.2)
 

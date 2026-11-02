@@ -285,6 +285,62 @@ async function main() {
   check('images: a permissive CDN is read without credentials', !!cdnResult && cdnResult.done === 'graphic' && !cdnResult.skip, JSON.stringify(cdnResult));
   await cdnPage.close();
 
+  // 4a2. a <picture> picks its frame from <source srcset>, which outranks the swapped img src
+  const picPage = await context.newPage();
+  await picPage.goto(`${base}/images/picture.html`, { waitUntil: 'load' });
+  await scrollThrough(picPage);
+  const picResult = await waitFor(picPage, () => {
+    const img = document.querySelector('img[data-picture]');
+    if (!img) return null;
+    if (img.dataset.sdDone) {
+      const shown = img.currentSrc || '';
+      return { done: img.dataset.sdDone, shown: shown.startsWith('blob:') ? 'blob' : shown, parked: img.dataset.sdSources || '' };
+    }
+    return img.dataset.sdSkip ? { skip: img.dataset.sdSkip } : null;
+  }, 30000);
+  check('images: a <picture> shows the dark frame, not the original source', !!picResult && picResult.done === 'graphic' && picResult.shown === 'blob' && !!picResult.parked, JSON.stringify(picResult));
+  // Turning images off for the origin makes the content script restore the page, sources included.
+  await setStorage({ darkSites: {}, imageSites: { '127.0.0.1': false } });
+  const picRestored = await waitFor(picPage, () => {
+    const img = document.querySelector('img[data-picture]');
+    const source = img.closest('picture').querySelector('source');
+    if (source.hasAttribute('srcset')) {
+      return { srcset: true, src: (img.getAttribute('src') || '').replace(location.origin, ''), marker: !!img.dataset.sdSources };
+    }
+    return null;
+  }, 15000) || await picPage.evaluate(() => {
+    const img = document.querySelector('img[data-picture]');
+    const source = img.closest('picture').querySelector('source');
+    return { srcset: source.hasAttribute('srcset'), src: (img.getAttribute('src') || '').replace(location.origin, ''), marker: !!img.dataset.sdSources };
+  });
+  await setStorage({ darkSites: {}, imageSites: {} });
+  // A framework re-render puts the original sources back after the swap; the dark frame must win again.
+  const picAgain = await waitFor(picPage, () => {
+    const img = document.querySelector('img[data-picture]');
+    return img.dataset.sdLocked && (img.currentSrc || '').startsWith('blob:') ? { locked: true } : null;
+  }, 15000);
+  check('images: the picture is converted again once images are back on', !!picAgain, JSON.stringify(picAgain));
+  const picFight = await waitFor(picPage, () => {
+    const img = document.querySelector('img[data-picture]');
+    if (!img.dataset.testFought) {
+      img.dataset.testFought = '1';
+      img.setAttribute('srcset', 'banner.png 1x');
+      img.closest('picture').querySelector('source').setAttribute('srcset', 'banner.png');
+      return null;
+    }
+    const shown = (img.currentSrc || '').startsWith('blob:');
+    // Clearing srcset leaves an empty attribute behind in Chrome, so an empty value counts as clean.
+    const clean = !img.getAttribute('srcset') && img.closest('picture').querySelectorAll('source[srcset]').length === 0;
+    return shown && clean ? { shown: 'blob', srcset: false, sources: 0, fought: true } : null;
+  }, 8000);
+  const picFightNow = !picFight ? await picPage.evaluate(() => {
+    const img = document.querySelector('img[data-picture]');
+    return { shown: (img.currentSrc || '').slice(0, 24), srcset: img.getAttribute('srcset'), sources: img.closest('picture').querySelectorAll('source[srcset]').length, parked: img.dataset.sdSources || '', locked: img.dataset.sdLocked || '', done: img.dataset.sdDone || '' };
+  }) : null;
+  check('images: a re-render that restores srcset does not bring the light original back', !!picFight && picFight.shown === 'blob' && picFight.fought === true, JSON.stringify(picFight || picFightNow));
+  check('images: hide puts the <source srcset> back', picRestored.srcset && picRestored.src === '/images/banner.png' && !picRestored.marker, JSON.stringify(picRestored));
+  await picPage.close();
+
   // 4b. a player that a site fix inverts must keep the clip un-inverted
   await setStorage({ darkSites: { '127.0.0.1': true }, imageSites: {} });
   const player = await context.newPage();

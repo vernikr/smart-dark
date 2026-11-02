@@ -328,9 +328,11 @@
       img.dataset.sdLocked = '1';
       if (img.srcset) { img.dataset.sdSrcset = img.srcset; img.srcset = ''; }
       if (img.sizes) img.sizes = '';
+      neutralizeSources(img);
       img.dataset.sdDone = entry.kind;
       img.dataset.sdInfo = `${entry.info.kind}/${entry.info.colors}/${entry.info.midShare.toFixed(2)}/${entry.info.opaque.toFixed(2)}`;
       img.style.setProperty('filter', 'none', 'important');
+      img.dataset.sdBlob = entry.url;
       img.src = entry.url;
     }
 
@@ -373,6 +375,48 @@
     }
   }
 
+  /* A responsive `<picture>` picks its source from the `<source srcset>` children, and that choice wins over `img.src`:
+     after the swap the browser kept showing the bright original while our dark blob sat unused in `src`. The sources are
+     parked in a data attribute (not deleted) so turning images off puts the page back exactly as it was. */
+  const SD_PARKED = 'sdSources';
+
+  function parkedOf(img) {
+    try {
+      const value = img.dataset[SD_PARKED];
+      return value ? JSON.parse(value) : null;
+    } catch (err) { return null; }
+  }
+
+  /* A site can put `srcset` back after the swap, so this runs on every failed re-assert and merges what it finds:
+     the first value seen per <source> is what restore() has to return, later ones are just the site repeating itself. */
+  function neutralizeSources(img) {
+    const picture = img.parentElement && img.parentElement.tagName === 'PICTURE' ? img.parentElement : null;
+    if (!picture) return;
+    const sources = [...picture.querySelectorAll('source')];
+    const live = sources.filter((source) => source.hasAttribute('srcset'));
+    if (!live.length) return;
+    const parked = parkedOf(img) || sources.map(() => null);
+    sources.forEach((source, index) => {
+      const value = source.getAttribute('srcset');
+      if (!value) return;
+      if (!parked[index]) parked[index] = value;
+      source.removeAttribute('srcset');
+    });
+    img.dataset[SD_PARKED] = JSON.stringify(parked);
+  }
+
+  function restoreSources(img) {
+    const parked = parkedOf(img);
+    if (!parked) return;
+    delete img.dataset[SD_PARKED];
+    const picture = img.parentElement && img.parentElement.tagName === 'PICTURE' ? img.parentElement : null;
+    if (!picture) return;
+    [...picture.querySelectorAll('source')].forEach((source, index) => {
+      const value = parked[index];
+      if (typeof value === 'string' && value && !source.hasAttribute('srcset')) source.setAttribute('srcset', value);
+    });
+  }
+
   function restore() {
     if (stopper) {
       stopper();
@@ -381,6 +425,7 @@
     document.querySelectorAll('img[data-sd-source]').forEach((img) => {
       const source = img.dataset.sdSource;
       const srcset = img.dataset.sdSrcset;
+      restoreSources(img);
       delete img.dataset.sdDone;
       delete img.dataset.sdInfo;
       delete img.dataset.sdSkip;
@@ -388,6 +433,7 @@
       delete img.dataset.sdTracked;
       delete img.dataset.sdLocked;
       delete img.dataset.sdSource;
+      delete img.dataset.sdBlob;
       delete img.dataset.sdAttempts;
       delete img.dataset.sdPending;
       img.style.removeProperty('filter');
@@ -456,10 +502,50 @@
       });
     };
 
+    /* Frameworks re-render an image after we swapped it, putting back `srcset` on the element or on its <source>
+       children, and occasionally the original `src`. Both outrank our frame, so the picture went back to the light
+       original on its own. A converted image is re-asserted instead of being handed back to the queue. */
+    const hasLiveSources = (img) => {
+      const picture = img.parentElement && img.parentElement.tagName === 'PICTURE' ? img.parentElement : null;
+      return !!(picture && picture.querySelector('source[srcset]'));
+    };
+
+    const holdOwn = (img) => {
+      const blob = img.dataset.sdBlob;
+      if (!blob) return;
+      const attr = img.getAttribute('src') || '';
+      if (attr !== blob && !attr.startsWith('blob:')) img.src = blob;
+      if (img.srcset) {
+        if (!img.dataset.sdSrcset) img.dataset.sdSrcset = img.getAttribute('srcset');
+        img.srcset = '';
+        if (img.sizes) img.sizes = '';
+      }
+      neutralizeSources(img);
+    };
+
     // Lazy loaders swap src after insertion, so a processed image can need a second pass.
     const refresh = (img) => {
-      const current = img.currentSrc || img.src;
-      if (img.dataset.sdLocked || current.startsWith('blob:')) return;
+      const attr = img.getAttribute('src') || '';
+      const current = img.currentSrc || img.src || attr;
+      if (img.dataset.sdLocked) {
+        // A re-render put a source back. A recycled card may legitimately hold a different picture, so only a new URL
+        // without any returning <source> is handed to the queue; anything else is the old frame coming back.
+        const source = img.dataset.sdSource || '';
+        const fresh = attr && attr !== img.dataset.sdBlob && attr !== source && !attr.startsWith('blob:');
+        if (fresh && !hasLiveSources(img)) {
+          delete img.dataset.sdLocked;
+          delete img.dataset.sdDone;
+          delete img.dataset.sdInfo;
+          delete img.dataset.sdBlob;
+          delete img.dataset.sdTracked;
+          restoreSources(img);
+          processor.enqueue(img);
+          return;
+        }
+        holdOwn(img);
+        return;
+      }
+      if (current.startsWith('blob:')) return;
       if (img.dataset.sdDone && (!img.dataset.sdSource || img.dataset.sdSource === current)) return;
       if (img.dataset.sdQueued && !img.dataset.sdDone) return;
       delete img.dataset.sdDone;

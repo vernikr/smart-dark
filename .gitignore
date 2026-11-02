@@ -3,3 +3,5 @@ dist/
 *.zip
 tmp/
 vendor/
+
+__pycache__/

@@ -22,7 +22,7 @@ Reference points: Dark Reader for page recolouring quality, DarkPage for image h
 
 ## Verification
 
-`npm test` runs 40 end-to-end checks in Chromium against local fixtures and the reference page `kiro.dev/blog/software-factory-stability/`: detection variants, live native-dark page, image classes with pixel statistics, switch persistence and popup wiring. Screenshots land in `shots/`.
+`npm test` runs 44 end-to-end checks in Chromium against local fixtures and the reference page `kiro.dev/blog/software-factory-stability/`: detection variants, live native-dark page, image classes with pixel statistics, switch persistence and popup wiring. Screenshots land in `shots/`.
 
 Tone curves were prototyped in Python against real artwork before porting, which caught two defects: a linear-space/perc-heights confusion that crushed dark text, and a hue-scaling branch that turned white logos grey.
 
@@ -104,6 +104,25 @@ Reported on meduza.io: pictures are darkened for a moment and then look restored
 | The same, on a framework re-render | After the swap a re-render can put `srcset` back on the element or on its `<source>` children, and either wins over our blob | A converted image is held, not silently overridden: a mutation that carries returning sources re-clears them, and only a genuinely new URL with no `<source>` present is handed back to the queue (paging recycles cards, so a new URL must still be converted) |
 
 Live after the fix — meduza front page: `16/5/{"already-dark":11}`, article: `15/5/{"small":2,"already-dark":8}`; every converted picture reports `currentSrc = blob:` and none of them has a live `<source srcset>`. Covered by two new checks in `npm test` (a `<picture>` fixture and a forced re-render that restores `srcset`); the suite is 40/40.
+
+## 1.2.4 follow-up
+
+Reported on `meduza.io/feature/2026/11/02/schitay-nas-prodali-no-my-privykli`: the photographs are not visible at all on first load, one picture is mistaken for an illustration and inverted, and after that inversion the frame holds more light than the original.
+
+| Report | Cause | Fix |
+| --- | --- | --- |
+| The photographs of the article are invisible | The loader parks a 1×1 transparent GIF in `img.src` and keeps the real frame in the `<source srcset>` of the `<picture>`. The layer read the element, so it classified and converted a one-pixel image (`graphic/1/0.00`) and then emptied the `<source>` children — the article was left with nothing but a darkened stand-in | A picture whose element decodes to 4 px or less is never read from the element: the frame is resolved from the `<source srcset>` children (live ones first, then the parked values of an earlier swap) and that frame is what gets classified. When no frame can be resolved the picture is left alone with `sdSkip=placeholder` |
+| A photograph is taken for an illustration and inverted | The stand-in was a photo, so cover pictures inherited the stand-in's analysis; and dark art with light lettering (a poster on a near-black plate) is genuinely flat — few colours — so the flat-art rule flipped it into a light page with dark lettering | Nothing left to invert once the frame is read. On top of that a flip is now checked against the original: if it raises the light share of the frame by more than 5 points, or keeps less than 45% of the original edge contrast, the picture gets the photographic curve instead (`dim`) — darkened, never inverted — and is skipped outright when even that would leave it lighter |
+| After the inversion the picture holds more light than before | Same rule, measured: the dark poster goes 10% → 66% light pixels; the dark strip of the legal footer goes 26% → 96% light and 32% → 57% mean, losing half its edge contrast | Both are now `dim` (0.22 mean, 0% light for the strip) or unchanged; the failure is caught by the before/after comparison, not by a class name |
+
+Measured on the live frames of that article (extension off, frames read through `<source>`): photographs `photo/79…134`, mean 0.42→0.29 and light 0.33→0.04; the bright illustration `graphic/57`, 0.72→0.34 — it is still flipped, correctly. The dark banner `already-dark` is untouched, and the dark strip is `dim` (0.32→0.22, light 0.26→0.00).
+
+`npm test` is 44/44: new fixtures `images/lazy.html` (a 1×1 `data:` stand-in with the frame in `<source>`, a dark lettering poster, a flat dark strip, and a bright control photograph), `poster-dark.png` and `strip-dark.png`.
+
+## Known limits (1.2.4)
+
+- The verdict of a flip is judged on a 160 px thumbnail; a picture whose light and dark areas swap their balance within that thumbnail can still be dimmed when a reader might have preferred the flip.
+- A stand-in that is larger than 4 px (a blurred low-res placeholder, for instance) is still read as a picture.
 
 ## Known limits (1.2.3)
 

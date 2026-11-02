@@ -258,7 +258,7 @@
         const outcome = await Promise.race([this.process(img), timeout]);
         if (outcome === 'timeout') img.dataset.sdSkip = 'timeout';
       } catch (err) {
-        img.dataset.sdSkip = err && err.message ? err.message : 'error';
+        img.dataset.sdSkip = err && (err.message || err.name) ? String(err.message || err.name) : 'error';
       }
       if (img.dataset.sdDone) {
         ledger.converted++;
@@ -275,7 +275,7 @@
     async process(img) {
       if (!img.isConnected) return;
       const url = img.currentSrc || img.src;
-      if (!url || url.startsWith('data:image/svg') || /\.svg(\?|#|$)/i.test(url)) return;
+      if (!url || url.startsWith('data:image/svg') || /\.svg(\?|#|$)/i.test(url)) { img.dataset.sdSkip = 'vector'; return; }
       // Images that fade in or mount late are retried shortly instead of being dropped.
       if (!this.isVisible(img)) {
         const attempts = Number(img.dataset.sdAttempts || 0);
@@ -285,8 +285,8 @@
         setTimeout(() => this.enqueue(img), VISIBILITY_RETRY_MS);
         return;
       }
-      if (!this.isLarge(img) && !fallbackBox(img)) return;
-      if (!this.claim(img, url)) return;
+      if (!this.isLarge(img) && !fallbackBox(img)) { img.dataset.sdSkip = 'small'; return; }
+      if (!this.claim(img, url)) { if (!img.dataset.sdDone) img.dataset.sdSkip = 'claimed'; return; }
       if (this.matches(img, this.selectors.ignore)) { img.dataset.sdSkip = 'ignore'; return; }
 
       // Lazy loaders hand out private object URLs that cannot be fetched again; the element itself is then the source.

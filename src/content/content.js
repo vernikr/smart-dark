@@ -90,9 +90,7 @@
   }
 
   function render() {
-    const trace = window.__sdTrace = window.__sdTrace || [];
     return getSettings().then((settings) => {
-      trace.push(`render images=${window.WD.isImageSite(settings, key) ? 1 : 0} keys=${Object.keys(settings.imageSites).join(',')}`);
       const forced = window.WD.isDarkSite(settings, key);
       let factoryDark = state.factoryDark;
       if (factoryDark === null) factoryDark = detect();

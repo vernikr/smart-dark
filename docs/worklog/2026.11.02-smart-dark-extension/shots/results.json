@@ -32,7 +32,12 @@
   {
     "name": "live: article diagrams converted on a native dark site",
     "ok": true,
-    "detail": "[{\"kind\":\"graphic\",\"info\":\"graphic/22/0.04/1.00\"},{\"kind\":\"graphic\",\"info\":\"graphic/26/0.07/1.00\"},{\"kind\":\"graphic\",\"info\":\"graphic/21/0.04/1.00\"}] | [{\"src\":\"-kiroween.svg?h=7166eaa7\",\"tracked\":\"1\",\"queued\":\"1\",\"done\":\"\",\"skip\":\"\",\"box\":\"0x0\"},{\"src\":\"-kiroween.svg?h=7166eaa7\",\"tracked\":\"1\",\"queued\":\"1\",\"done\":\"\",\"skip\":\"\",\"box\":\"57x27\"},{\"src\":\"s/joe-guo.jpg?h=f7fedb67\",\"tracked\":\"1\",\"queued\":\"1\",\"done\":\"\",\"skip\":\"\",\"box\":\"32x32\"},{\"src\":\"olin-chen.jpg?h=003e7f84\",\"tracked\":\"1\",\"queued\":\"1\",\"done\":\"\",\"skip\":\"\",\"box\":\"32x32\"},{\"src\":\"zezhen-xu.jpg?h=b90b259e\",\"tracked\":\"1\",\"queued\":\"1\",\"done\":\"\",\"skip\":\"\",\"box\":\"32x32\"},{\"src\":\"e-4795-ad79-842c0b36dccd\",\"tracked\":\"1\",\"queued\":\"1\",\"done\":\"graphic\",\"skip\":\"\",\"box\":\"755x425\"},{\"src\":\"0-44f5-85e9-882c9eaea1ee\",\"tracked\":\"1\",\"queued\":\"1\",\"done\":\"graphic\",\"skip\":\"\",\"box\":\"755x425\"},{\"src\":\"0-45de-83ec-c449f03f2178\",\"tracked\":\"1\",\"queued\":\"1\",\"done\":\"graphic\",\"skip\":\"\",\"box\":\"755x425\"},{\"src\":\"ospective.png?h=babd846d\",\"tracked\":\"1\",\"queued\":\"1\",\"done\":\"\",\"skip\":\"\",\"box\":\"755x425\"},{\"src\":\"-wordmark.png?h=0ad65a93\",\"tracked\":\"1\",\"queued\":\"1\",\"done\":\"\",\"skip\":\"\",\"box\":\"76x24\"}]"
+    "detail": "[{\"kind\":\"graphic\",\"info\":\"graphic/22/0.04/1.00\"},{\"kind\":\"graphic\",\"info\":\"graphic/26/0.07/1.00\"},{\"kind\":\"graphic\",\"info\":\"graphic/21/0.04/1.00\"}]"
+  },
+  {
+    "name": "live: no image left in a failed state",
+    "ok": true,
+    "detail": "[]"
   },
   {
     "name": "images: photo, diagrams and logo classified separately",

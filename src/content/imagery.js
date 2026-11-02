@@ -210,23 +210,19 @@
       if (img.dataset.sdDone || img.dataset.sdQueued) return;
       img.dataset.sdQueued = '1';
       this.queue.push(img);
-      if (window.__sdTrace) window.__sdTrace.push('enqueue:' + (img.currentSrc || img.src).slice(-16));
       if (!this.busy) this.drain();
     }
 
     async drain() {
       this.busy = true;
-      if (window.__sdTrace) window.__sdTrace.push('drain-start:' + this.queue.length);
       while (this.queue.length) {
         const img = this.queue.shift();
         const timeout = new Promise((resolve) => setTimeout(() => resolve('timeout'), IMAGE_TIMEOUT_MS));
-        if (window.__sdTrace) window.__sdTrace.push('process:' + (img.currentSrc || img.src).slice(-18) + ':large=' + (this.isLarge(img) ? 1 : 0));
         try {
           const outcome = await Promise.race([this.process(img), timeout]);
           if (outcome === 'timeout') img.dataset.sdSkip = 'timeout';
         } catch (err) {
           img.dataset.sdSkip = err && err.message ? err.message : 'error';
-          if (window.__sdTrace) window.__sdTrace.push('error:' + (err && err.message ? err.message : String(err)));
         }
       }
       this.busy = false;
@@ -248,8 +244,6 @@
       }
       if (!this.claim(img, url)) return;
       if (this.matches(img, this.selectors.ignore)) { img.dataset.sdSkip = 'ignore'; return; }
-
-      if (window.__sdTrace) window.__sdTrace.push('accepted:' + url.slice(-14));
 
       const soft = this.matches(img, this.selectors.invert);
       const key = `${url}|${soft ? 'soft' : 'auto'}`;
@@ -275,7 +269,6 @@
       try {
         bitmap = await loadBitmap(url);
       } catch (err) {
-        if (window.__sdTrace) window.__sdTrace.push('load-fail:' + url.slice(-14) + ':' + (err && err.message ? err.message : err));
         return { reason: 'cross-origin' };
       }
       const naturalW = bitmap.width || bitmap.naturalWidth;
@@ -311,8 +304,6 @@
   function start(options) {
     const processor = new Processor(options.selectors);
     const seen = new WeakSet();
-    const trace = window.__sdTrace = window.__sdTrace || [];
-    trace.push('start');
 
     const consider = (el) => {
       if (seen.has(el)) return;
@@ -330,7 +321,6 @@
     }, { rootMargin: '600px' });
 
     const track = () => {
-      trace.push('track:' + document.querySelectorAll('img').length);
       document.querySelectorAll('img').forEach((img) => {
         if (!img.dataset.sdTracked) {
           img.dataset.sdTracked = '1';

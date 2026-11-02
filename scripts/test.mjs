@@ -126,9 +126,6 @@ async function main() {
     await scrollThrough(kiro);
     await kiro.waitForTimeout(1500);
     await scrollThrough(kiro);
-    const trace = await kiro.evaluate(() => (window.__sdTrace || []).slice(-14));
-    const queue = await kiro.evaluate(() => Array.from(document.images).map((i) => ({ b: i.dataset.sdBusy || '', l: i.dataset.sdLocked || '', q: i.dataset.sdQueued || '', k: i.dataset.sdSkip || '' })));
-    console.log('trace:', JSON.stringify(trace), 'queue:', JSON.stringify(queue));
     const diagnostics = await kiro.evaluate(() => Array.from(document.images).map((i) => ({
       src: (i.currentSrc || i.src).slice(-24), tracked: i.dataset.sdTracked || '', queued: i.dataset.sdQueued || '',
       done: i.dataset.sdDone || '', skip: i.dataset.sdSkip || '',
@@ -139,7 +136,8 @@ async function main() {
       const done = Array.from(document.images).filter((i) => i.dataset.sdDone && i.dataset.sdDone !== 'skip-dark');
       return done.length >= 3 ? done.map((i) => ({ kind: i.dataset.sdDone, info: i.dataset.sdInfo })) : null;
     }, 30000);
-    check('live: article diagrams converted on a native dark site', !!converted, JSON.stringify(converted) + ' | ' + JSON.stringify(diagnostics));
+    check('live: article diagrams converted on a native dark site', !!converted, JSON.stringify(converted));
+    check('live: no image left in a failed state', !diagnostics.some((d) => d.skip && d.skip !== 'already-dark'), JSON.stringify(diagnostics.filter((d) => d.skip)));
     const firstConverted = kiro.locator('img[data-sd-done]').first();
     if (await firstConverted.count()) {
       await firstConverted.scrollIntoViewIfNeeded();

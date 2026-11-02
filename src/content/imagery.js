@@ -165,7 +165,18 @@
     if (url.startsWith('data:')) return decodeBlob(await (await fetch(url)).blob());
     const response = await fetch(url, { credentials: 'include' });
     if (!response.ok) throw new Error('fetch-failed');
-    return decodeBlob(await response.blob());
+    let blob;
+    try { blob = await response.blob(); } catch (err) { throw new Error('empty-body'); }
+    if (!blob || !blob.size) throw new Error('empty-body');
+    return decodeBlob(blob);
+  }
+
+  /* A picture whose own box never reported a size is judged by the frame it was drawn in. */
+  function fallbackBox(img) {
+    const frame = img.parentElement;
+    if (!frame) return null;
+    const rect = frame.getBoundingClientRect();
+    return rect.width >= MIN_WIDTH && rect.height >= MIN_HEIGHT ? rect : null;
   }
 
   function toObjectURL(canvas) {
@@ -215,7 +226,7 @@
     }
 
     isVisible(el) {
-      if (!el.getClientRects().length) return false;
+      if (!el.getClientRects().length && !fallbackBox(el)) return false;
       const style = getComputedStyle(el);
       return style.visibility !== 'hidden' && Number(style.opacity) > 0.05;
     }
@@ -272,7 +283,7 @@
         setTimeout(() => this.enqueue(img), VISIBILITY_RETRY_MS);
         return;
       }
-      if (!this.isLarge(img)) return;
+      if (!this.isLarge(img) && !fallbackBox(img)) return;
       if (!this.claim(img, url)) return;
       if (this.matches(img, this.selectors.ignore)) { img.dataset.sdSkip = 'ignore'; return; }
 

@@ -15,18 +15,25 @@ if (!worker) {
 await worker.evaluate((v) => chrome.storage.local.set(v), { darkSites: { 'youtube.com': true }, imageSites: {} });
 const page = await ctx.newPage();
 await page.goto('https://www.youtube.com/watch?v=jfKfPfyJRdk', { waitUntil: 'domcontentloaded', timeout: 60000 }).catch(() => {});
-await page.waitForTimeout(8000);
-console.log(JSON.stringify(await page.evaluate(() => {
+
+const seen = [];
+for (let i = 0; i < 16; i += 1) {
+  await page.waitForTimeout(500);
+  const state = await page.evaluate(() => document.documentElement.dataset.sdState || '').catch(() => '');
+  if (state && seen[seen.length - 1] !== state) seen.push(state);
+}
+console.log(seen.join('\n'));
+
+const sheet = await page.evaluate(() => {
   const hits = [];
-  for (const sheet of document.styleSheets) {
+  for (const style of document.styleSheets) {
     let rules = [];
-    try { rules = Array.from(sheet.cssRules); } catch { continue; }
-    const walk = (list) => list.forEach((rule) => {
-      if (rule.cssRules) walk(Array.from(rule.cssRules));
-      if (rule.selectorText && /movie_player|html5-video-player/.test(rule.selectorText)) hits.push(rule.cssText.slice(0, 200));
+    try { rules = Array.from(style.cssRules); } catch { return 'blocked:' + style.href; }
+    rules.forEach((rule) => {
+      if (rule.selectorText && /\.html5-video-player/.test(rule.selectorText) && rule.style && rule.style.filter) hits.push(rule.cssText.slice(0, 160));
     });
-    walk(rules);
   }
-  return { state: document.documentElement.dataset.sdState, hits: hits.slice(0, 6) };
-}), null, 1));
+  return hits;
+});
+console.log('SHEET', JSON.stringify(sheet));
 await ctx.close();

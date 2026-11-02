@@ -3,7 +3,7 @@
 Chrome/Edge extension that darkens light websites and darkens large images without losing their colours.
 
 - **Site layer.** Detects whether a site already ships a dark theme — from what the site declares (`<html dark>`, `body.dark`, `data-theme`, `color-scheme`) and from what it paints (canvas and element colours, gradients, text). Light sites are darkened automatically; sites that are dark already are left alone. The switch `Затемнять сайт <domain>` overrides the detection and is remembered per site.
-- **Image layer.** Large images (article art, landing illustrations, diagrams, photos, transparent logos and icons) are re-toned so they sit on a dark page. Hue, saturation and transparency are preserved: light artwork is remapped into a dark band instead of being inverted or dimmed. The layer is **on for every site by default**; the switch `Затемнять изображения на <domain>` turns it off for one site and is remembered.
+- **Image layer.** Large pictures (article art, landing illustrations, diagrams, photos, transparent logos and icons) are re-toned so they sit on a dark page. Hue, saturation and transparency are preserved. Bright flat art is remapped into a dark band by inverting its polarity; a photograph is darkened without inversion; dark art that a flip would turn into a light page is darkened instead, and a picture that is already dark is not touched. The layer is **on for every site by default**; the switch `Затемнять изображения на <domain>` turns it off for one site and is remembered.
 
 Both switches live in the toolbar popup. There are no other settings.
 
@@ -21,14 +21,19 @@ Both switches live in the toolbar popup. There are no other settings.
 | Site with its own dark theme | Untouched, images can still be converted |
 | Switch `Затемнять сайт` turned on by hand | Site is darkened even if it has a dark theme |
 | Switch `Затемнять сайт` turned off by hand | Site stays light on later visits |
-| Any site, image switch untouched | Large raster images are re-toned; SVG art, already-dark images (less than a quarter of light pixels) and small UI icons are skipped |
+| Any site, image switch untouched | Pictures from 260×140 (or 90 000 px²) are re-toned. SVG art, pictures already dark (less than a quarter of light pixels), small UI icons and lazy 1×1 stand-ins are skipped, each with a named reason |
+| Bright flat art (diagram, banner, illustration) | Polarity flipped into a dark band; hue kept |
+| Photograph, or art a flip would make lighter or flatter | Darkened with the photographic curve (`dim`), never inverted |
 | Page with a video player | The clip, canvas, `picture` and iframes are excluded from image analysis, so a site fix that inverts the player wrapper cannot invert the video |
-| Any site, image switch off | The site renders original artwork; already converted images are restored in place |
+| Responsive `<picture>` | The frame comes from the `<source srcset>`; those sources are parked while the picture is dark and restored on demand |
+| Any site, image switch off | The site renders original artwork; already converted images are restored in place, `<source>` included |
 
 ## Where the logic comes from
 
 - Site recolouring uses the Dark Reader API runtime with the project's per-site fix lists, so page quality matches Dark Reader. Fonts are switched to the system stack and system controls are themed, as Dark Reader does by default.
-- Image re-toning is implemented here: pixel classification into photo / graphic / icon, then a lightness remap in perceptual sRGB space that keeps hue and chroma, plus a hover-free swap of the rendered pixels.
+- Image re-toning is implemented here: pixel classification into photo / graphic / icon, a lightness remap in linear-light sRGB that keeps hue and chroma, a before/after check that rejects a transformation which makes the picture lighter or flatter, and a hover-free swap of the rendered pixels.
+
+The complete rule set — detection thresholds, the decision tables, every skip reason and the non-goals — is written down in [`docs/BUSINESS-LOGIC.md`](docs/BUSINESS-LOGIC.md).
 
 ## Development
 

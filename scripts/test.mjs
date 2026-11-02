@@ -466,6 +466,25 @@ async function main() {
   server.close();
   cdn.close();
 
+  // 7. the specification in docs/BUSINESS-LOGIC.md must cover every verdict, skip reason and limit the code can emit
+  {
+    const imagerySource = fs.readFileSync(path.join(process.cwd(), 'src/content/imagery.js'), 'utf8');
+    const spec = fs.readFileSync(path.join(process.cwd(), 'docs/BUSINESS-LOGIC.md'), 'utf8');
+    const reasons = new Set([
+      ...[...imagerySource.matchAll(/sdSkip = '([a-z-]+)'/g)].map((m) => m[1]),
+      ...[...imagerySource.matchAll(/reason: '([a-z-]+)'/g)].map((m) => m[1]),
+      ...[...imagerySource.matchAll(/last = '([a-z-]+)'/g)].map((m) => m[1]),
+    ].filter(Boolean));
+    const unlisted = [...reasons].filter((reason) => !spec.includes(reason));
+    check('docs: every skip reason the code can emit is specified', unlisted.length === 0, JSON.stringify(unlisted));
+    const verdicts = ['photo', 'graphic', 'icon', 'dim', 'already-dark', 'placeholder'];
+    const undocumented = verdicts.filter((verdict) => !spec.includes(verdict));
+    check('docs: every verdict is specified', undocumented.length === 0, JSON.stringify(undocumented));
+    const limits = ['FLIP_LIGHT_WORSENS', 'FLIP_CONTRAST_FLOOR', 'MIN_AREA', 'IMAGE_TIMEOUT_MS'];
+    const unnamed = limits.filter((name) => !spec.includes(name));
+    check('docs: the rejection and skip limits are named in the spec', unnamed.length === 0, JSON.stringify(unnamed));
+  }
+
   const failed = results.filter((r) => !r.ok);
   console.log(`\n${results.length - failed.length}/${results.length} checks passed`);
   fs.writeFileSync(path.join(shots, 'results.json'), JSON.stringify(results, null, 2));

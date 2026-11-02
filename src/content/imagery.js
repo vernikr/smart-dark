@@ -424,7 +424,10 @@
       try {
         bitmap = element || await loadBitmap(url);
       } catch (err) {
-        return { reason: 'cross-origin' };
+        // fetchBody names the cause (`http-403`, `empty-body`, `cross-origin`); a decode failure is its own reason.
+        const message = err && err.message ? String(err.message) : '';
+        const named = /^(cross-origin|empty-body|http-\d{3}|fetch-failed|decode-failed)$/.test(message);
+        return { reason: named ? message : 'decode-failed' };
       }
       if (isPlaceholder(bitmap)) {
         // Deliberately unsupported: a real frame of this picture was tried and there is nothing to read.

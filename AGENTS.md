@@ -14,7 +14,8 @@
 - Pages with their own scroll container ignore `window.scrollTo`; the reusable helper in `scripts/test.mjs` sets `scrollTop` on `documentElement` and `body` as well.
 - Images that fade in through CSS transitions used to be postponed until the transition ended, which is exactly when the light original is on screen. A transparent image is a candidate; only `display: none`, `visibility: hidden` and a missing box postpone it, and retries are bounded.
 - A grid cell can be laid out after its image mounts, so an image may report a `0x0` box while its parent already has the final size. Size guesses fall back to the parent (`fallbackBox()` in `src/content/imagery.js`).
-- `html[data-sd-images="started/converted/{reasons}"]` is the ledger: every skip carries a reason (`small`, `vector`, `already-dark`, `not-visible`, `claimed`, `empty-body`, `cross-origin`). A light picture without a reason is a bug, not a policy.
+- `html[data-sd-images="started/converted/{reasons}"]` is the ledger: every skip carries a reason (`small`, `vector`, `already-dark`, `not-visible`, `claimed`, `ignore`, `placeholder`, `not-loaded`, `timeout`, `empty`, `decode-failed`, `empty-body`, `cross-origin`, `http-<code>`, `fetch-failed`). A light picture without a reason is a bug, not a policy.
+- The whole rule set (detection thresholds, decision tables, skip reasons, non-goals) is specified in `docs/BUSINESS-LOGIC.md`. Change a rule → change that file in the same commit; a rule that is in the code and not in the document is an unfinished change.
 
 ## Detection pitfalls
 - Sites announce their theme late: YouTube adds `<html dark>` only after its first paint. `detect()` in `src/content/content.js` therefore always re-runs before a render decision and lets a declared verdict (`declared-dark` / `declared-light`) override an earlier measured one; measurement is only the fallback until the site speaks.
@@ -25,6 +26,12 @@
 
 ## Fix lists on pages that are already dark
 `data/fixes.json` is a slice of Dark Reader's config, written for sites that ship a light layout. Applying it to a page our own theme darkened inverted the YouTube player wrapper and the clip with it. Two guards in `src/content/content.js`: `fixesFor()` drops the whole list when the site declares its own dark theme, and `invertSelectors()` drops every media container (`video`, `player`, `media` in the selector) while the document holds a `<video>`. `applyTheme()` keys on the applied list rather than on a yes/no flag, so a video mounting later re-applies the theme without it.
+
+## Lazy stand-ins and responsive `<picture>`
+A lazy loader can park a 1×1 transparent GIF in `img.src` while the real frame sits in a `<source srcset>`. Reading the element then means reading one pixel: `classify()` called it `graphic/1/0.00`, the layer swapped in a darkened stand-in and cleared the `<source>` children — meduza.io articles showed nothing. `process()` therefore resolves the frame from `parkedFrames()` → `pictureFrames()` → `srcsetFrames()` whenever the element decodes to 4 px or less, and `build()` refuses a stand-in outright (`sdSkip=placeholder`). The `<source>` values are parked in `data-sd-sources`, never deleted, so `restore()` puts the page back exactly; a re-render that returns `srcset` is cleared again by `holdOwn()`.
+
+## When a transformation is rejected as "worse"
+A polarity flip is not automatically an improvement. `build()` compares the result with the original on a 160 px thumbnail (`thumbnailStats()`): a flip that raises the light share by more than 5 points, or keeps less than 45 % of the edge contrast, is replaced by the photographic curve and reported as `dim`. This is what keeps dark art with light lettering and flat dark banners from turning into light pages. Do not "fix" a `dim` verdict by widening the class threshold — the threshold describes the picture, this check describes the result.
 
 ## Media that must never be filtered
 `THEME.ignoreImageAnalysis` in `src/content/content.js` always contains `video, canvas, picture, iframe` and is merged with the per-site `ignore` list from `data/fixes.json`. Reason: Dark Reader's `INVERT` rules (for example `.html5-video-player` on YouTube) produce `selector > * { filter: invert(...) }`, and without the ignore list the rule lands on the `<video>` element and flips the clip. A test in `scripts/test.mjs` builds this case from `fixtures/video/` on purpose.

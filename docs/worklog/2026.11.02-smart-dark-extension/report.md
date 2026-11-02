@@ -16,13 +16,15 @@ Reference points: Dark Reader for page recolouring quality, DarkPage for image h
 | Page recolouring | Dark Reader bundle embedded and driven from the content script; per-site fix lists compiled from the vendored Dark Reader tree |
 | Detection | Body background luminance first, viewport sampling of painted backgrounds as fallback, then `color-scheme`, `data-theme` hints and text luminance |
 | Image classes | `photo` (many colours, midtones), `graphic` (few colours or light-background flat art), `icon` (transparency) |
-| Tone mapping | Perceptual sRGB lightness remap; graphics flip polarity into a dark band, photos are gently dimmed, ink stays legible; hue and chroma kept, alpha untouched |
+| Tone mapping | Lightness remap in linear-light sRGB; graphics flip polarity into a dark band, photos are gently dimmed, ink stays legible; hue and chroma kept, alpha untouched. A flip that would leave the picture lighter or flatter than the original is replaced by the dim (`dim`) |
 | Swap | Pixels re-encoded to a PNG blob and assigned to `img.src`; `filter` cleared so Dark Reader cannot double-process |
 | Persistence | `storage.local` maps `darkSites` / `imageSites`, `false`/`true` are explicit overrides, missing key means auto |
 
+The complete rule set — every threshold, decision table, skip reason and non-goal — is specified in `docs/BUSINESS-LOGIC.md`; the test suite fails if a verdict, a skip reason or a rejection limit exists in the code but not in that file.
+
 ## Verification
 
-`npm test` runs 44 end-to-end checks in Chromium against local fixtures and the reference page `kiro.dev/blog/software-factory-stability/`: detection variants, live native-dark page, image classes with pixel statistics, switch persistence and popup wiring. Screenshots land in `shots/`.
+`npm test` runs 47 end-to-end checks in Chromium against local fixtures and the reference page `kiro.dev/blog/software-factory-stability/`: detection variants, live native-dark page, image classes with pixel statistics, switch persistence and popup wiring. Screenshots land in `shots/`.
 
 Tone curves were prototyped in Python against real artwork before porting, which caught two defects: a linear-space/perc-heights confusion that crushed dark text, and a hue-scaling branch that turned white logos grey.
 
@@ -118,6 +120,27 @@ Reported on `meduza.io/feature/2026/11/02/schitay-nas-prodali-no-my-privykli`: t
 Measured on the live frames of that article (extension off, frames read through `<source>`): photographs `photo/79…134`, mean 0.42→0.29 and light 0.33→0.04; the bright illustration `graphic/57`, 0.72→0.34 — it is still flipped, correctly. The dark banner `already-dark` is untouched, and the dark strip is `dim` (0.32→0.22, light 0.26→0.00).
 
 `npm test` is 44/44: new fixtures `images/lazy.html` (a 1×1 `data:` stand-in with the frame in `<source>`, a dark lettering poster, a flat dark strip, and a bright control photograph), `poster-dark.png` and `strip-dark.png`.
+
+## Documentation pass (1.2.4)
+
+Business logic used to live in the code, in `AGENTS.md` and in this report, while `README.md` described an older rule
+("light artwork is remapped into a dark band instead of being inverted or dimmed") that no longer matched the code.
+
+| Area | Now |
+| --- | --- |
+| Product rules | `docs/BUSINESS-LOGIC.md` — five rules: two independent layers, unset means auto, an explicit choice wins, no network, a page is never made lighter |
+| Site layer | Declared-then-measured detection with the 75 % / 34 % / 55 % canvas thresholds, the decision table for the switch, re-render points, fix-list and media guards |
+| Image layer | Candidate gate with all 18 skip reasons, the classification table, the four curves, the "did it get worse?" test with both limits, the `<picture>`/re-render handling, the diagnostics contract |
+| Settings | Storage shape, key normalisation, popup states |
+| Non-goals and limits | Explicit list, including the overcast-sky question that is still open with the user |
+
+`README.md` now describes what the image layer actually does and links to the specification; `AGENTS.md` records the two
+rules that are easiest to break by accident (lazy stand-ins, and "a flip is not automatically an improvement").
+
+Three checks were added to `npm test` (47/47): a verdict, a skip reason or a rejection limit that is in the code and not
+in the specification fails the suite. A reporting fix came out of the same pass: a failed fetch used to be reported as
+`cross-origin` whatever the cause, hiding `http-403` and `empty-body` behind a wrong name; the reason is now passed
+through.
 
 ## Known limits (1.2.4)
 

@@ -2,7 +2,7 @@
   {
     "name": "detection: light page",
     "ok": true,
-    "detail": "{\"factoryDark\":false,\"detected\":true,\"dark\":true,\"reason\":\"measured-light\",\"imageError\":null}"
+    "detail": "{\"factoryDark\":false,\"detected\":true,\"dark\":true,\"reason\":\"measured-light\",\"imageError\":null,\"video\":false,\"invertCount\":0,\"styleKey\":\"false|\"}"
   },
   {
     "name": "detection: light page gets the theme without manual action",
@@ -12,27 +12,27 @@
   {
     "name": "detection: data-theme dark page",
     "ok": true,
-    "detail": "{\"factoryDark\":true,\"detected\":true,\"dark\":false,\"reason\":\"declared-dark\",\"imageError\":null}"
+    "detail": "{\"factoryDark\":true,\"detected\":true,\"dark\":false,\"reason\":\"declared-dark\",\"imageError\":null,\"video\":false,\"invertCount\":0,\"styleKey\":\"true|\"}"
   },
   {
     "name": "detection: body.dark page",
     "ok": true,
-    "detail": "{\"factoryDark\":true,\"detected\":true,\"dark\":false,\"reason\":\"declared-dark\",\"imageError\":null}"
+    "detail": "{\"factoryDark\":true,\"detected\":true,\"dark\":false,\"reason\":\"declared-dark\",\"imageError\":null,\"video\":false,\"invertCount\":0,\"styleKey\":\"true|\"}"
   },
   {
     "name": "detection: page whose dark canvas is painted by gradients",
     "ok": true,
-    "detail": "{\"factoryDark\":true,\"detected\":true,\"dark\":false,\"reason\":\"measured-dark\",\"imageError\":null}"
+    "detail": "{\"factoryDark\":true,\"detected\":true,\"dark\":false,\"reason\":\"measured-dark\",\"imageError\":null,\"video\":false,\"invertCount\":0,\"styleKey\":\"true|\"}"
   },
   {
     "name": "detection: page with a dark hero only",
     "ok": true,
-    "detail": "{\"factoryDark\":false,\"detected\":true,\"dark\":true,\"reason\":\"measured-light\",\"imageError\":null}"
+    "detail": "{\"factoryDark\":false,\"detected\":true,\"dark\":true,\"reason\":\"measured-light\",\"imageError\":null,\"video\":false,\"invertCount\":0,\"styleKey\":\"false|\"}"
   },
   {
     "name": "live: native dark blog detected",
     "ok": true,
-    "detail": "{\"factoryDark\":true,\"detected\":true,\"dark\":false,\"reason\":\"declared-dark\",\"imageError\":null}"
+    "detail": "{\"factoryDark\":true,\"detected\":true,\"dark\":false,\"reason\":\"declared-dark\",\"imageError\":null,\"video\":false,\"invertCount\":0,\"styleKey\":\"true|\"}"
   },
   {
     "name": "live: theme stays off on native dark blog",
@@ -42,12 +42,12 @@
   {
     "name": "arena.ai: light challenge page is not mistaken for a dark theme",
     "ok": true,
-    "detail": "{\"factoryDark\":false,\"detected\":true,\"dark\":true,\"reason\":\"measured-light\",\"imageError\":null}"
+    "detail": "{\"factoryDark\":false,\"detected\":true,\"dark\":true,\"reason\":\"measured-light\",\"imageError\":null,\"video\":false,\"invertCount\":0,\"styleKey\":\"false|\"}"
   },
   {
     "name": "live: article diagrams converted on a native dark site",
     "ok": true,
-    "detail": "{\"started\":55,\"converted\":1,\"reasons\":{\"unprocessed\":54}}"
+    "detail": "{\"started\":41,\"converted\":4,\"reasons\":{\"small\":10,\"unprocessed\":16,\"vector\":11}}"
   },
   {
     "name": "live: no image left in a failed state",
@@ -55,14 +55,19 @@
     "detail": "[]"
   },
   {
+    "name": "live: every skipped image says why",
+    "ok": true,
+    "detail": "[\"vector\",\"vector\",\"small\",\"small\",\"small\",\"small\"]"
+  },
+  {
     "name": "youtube: the dark theme announced on <html> is picked up",
     "ok": true,
-    "detail": "{\"factoryDark\":true,\"detected\":true,\"dark\":false,\"reason\":\"declared-dark\",\"imageError\":null}"
+    "detail": "{\"factoryDark\":true,\"detected\":true,\"dark\":false,\"reason\":\"declared-dark\",\"imageError\":null,\"video\":true,\"invertCount\":0,\"styleKey\":\"true|\"}"
   },
   {
     "name": "youtube: no layer of our theme is painted over the page",
     "ok": true,
-    "detail": "{\"factoryDark\":true,\"detected\":true,\"dark\":false,\"reason\":\"declared-dark\",\"imageError\":null}"
+    "detail": "{\"factoryDark\":true,\"detected\":true,\"dark\":false,\"reason\":\"declared-dark\",\"imageError\":null,\"video\":true,\"invertCount\":0,\"styleKey\":\"true|\"}"
   },
   {
     "name": "youtube: the clip is never inverted",
@@ -107,7 +112,7 @@
   {
     "name": "video: forced theme is applied",
     "ok": true,
-    "detail": "{\"factoryDark\":false,\"detected\":true,\"dark\":true,\"reason\":\"measured-light\",\"imageError\":null}"
+    "detail": "{\"factoryDark\":false,\"detected\":true,\"dark\":true,\"reason\":\"measured-light\",\"imageError\":null,\"video\":true,\"invertCount\":0,\"styleKey\":\"false|\"}"
   },
   {
     "name": "video: an inverted player wrapper does not invert the clip",
@@ -167,6 +172,6 @@
   {
     "name": "site layer follows the switch",
     "ok": true,
-    "detail": "{\"factoryDark\":false,\"detected\":true,\"dark\":false,\"reason\":\"measured-light\",\"imageError\":null}"
+    "detail": "{\"factoryDark\":false,\"detected\":true,\"dark\":false,\"reason\":\"measured-light\",\"imageError\":null,\"video\":false,\"invertCount\":0,\"styleKey\":\"false|\"}"
   }
 ]

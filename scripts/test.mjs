@@ -162,7 +162,11 @@ async function main() {
       return Number(converted) >= 1 ? { started: Number(started), converted: Number(converted), reasons: JSON.parse(reasons) } : null;
     }, 30000);
     check('live: article diagrams converted on a native dark site', !!ledger, ledger ? JSON.stringify(ledger) : 'no conversion');
-    check('live: no image left in a failed state', !diagnostics.some((d) => d.skip && d.skip !== 'already-dark'), JSON.stringify(diagnostics.filter((d) => d.skip)));
+    // Every skip must be a deliberate decision, never a breakdown: small and vector pictures are not candidates at all.
+    const DELIBERATE = ['already-dark', 'small', 'vector', 'ignore'];
+    const broken = diagnostics.filter((d) => d.skip && !DELIBERATE.includes(d.skip));
+    check('live: no image left in a failed state', !broken.length, JSON.stringify(broken));
+    check('live: every skipped image says why', diagnostics.every((d) => !d.skip || DELIBERATE.includes(d.skip)), JSON.stringify(diagnostics.filter((d) => d.skip).map((d) => d.skip)));
     const firstConverted = kiro.locator('img[data-sd-done]').first();
     if (await firstConverted.count()) {
       await firstConverted.scrollIntoViewIfNeeded();

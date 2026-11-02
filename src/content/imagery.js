@@ -95,7 +95,9 @@
     const midShare = mid / Math.max(1, total - transparent);
     let kind = 'photo';
     if (opaque < 0.98) kind = 'icon';
-    else if (seen.size <= 32 || midShare < 0.18) kind = 'graphic';
+    // Flat art is posterised: a real photograph keeps hundreds of distinct colours at this grid, an illustration
+    // of a few brand colours keeps tens, however bright its background is.
+    else if (seen.size <= 64 || midShare < 0.18) kind = 'graphic';
     let lightPixels = 0;
     for (let i = 0; i < data.length; i += 4) {
       if (data[i + 3] < 26) continue;
@@ -161,14 +163,29 @@
     });
   }
 
+  /* A CDN that answers `Access-Control-Allow-Origin: *` rejects any request carrying cookies, so the anonymous
+     attempt comes first and credentials are only added for hosts that need a session. */
+  async function fetchBody(url) {
+    const attempts = [{ credentials: 'omit' }, { credentials: 'include' }];
+    let last = 'fetch-failed';
+    for (const options of attempts) {
+      try {
+        const response = await fetch(url, options);
+        if (!response.ok) { last = `http-${response.status}`; continue; }
+        let blob;
+        try { blob = await response.blob(); } catch (err) { last = 'empty-body'; continue; }
+        if (blob && blob.size) return blob;
+        last = 'empty-body';
+      } catch (err) {
+        last = 'cross-origin';
+      }
+    }
+    throw new Error(last);
+  }
+
   async function loadBitmap(url) {
     if (url.startsWith('data:')) return decodeBlob(await (await fetch(url)).blob());
-    const response = await fetch(url, { credentials: 'include' });
-    if (!response.ok) throw new Error('fetch-failed');
-    let blob;
-    try { blob = await response.blob(); } catch (err) { throw new Error('empty-body'); }
-    if (!blob || !blob.size) throw new Error('empty-body');
-    return decodeBlob(blob);
+    return decodeBlob(await fetchBody(url));
   }
 
   /* A picture whose own box never reported a size is judged by the frame it was drawn in. */

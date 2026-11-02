@@ -82,7 +82,21 @@ Live result on the installed build: no filter anywhere in the video's ancestor c
 
 The ledger, `html[data-sd-images="started/converted/reasons"]`, now names each skip (`small`, `vector`, `already-dark`, `not-visible`, `claimed`, `empty-body`, `cross-origin`), because without it a light picture is indistinguishable from an unprocessed one.
 
-## Known limits (1.2.1)
+## 1.2.2 follow-up
+
+Reported on habr.com: the photo with the gas tanks in the feed and both illustrations of the cloud.ru article stayed light.
+
+| Report | Cause | Fix |
+| --- | --- | --- |
+| Nothing is darkened on habr.com at all | Images are served from `habrastorage.org`, which answers `Access-Control-Allow-Origin: *`. A request that carries cookies is rejected by the browser against a wildcard origin, and the bitmap fetch used `credentials: 'include'` — so every picture ended in `cross-origin` | The anonymous request is tried first and the credentialed one is kept as a fallback for hosts that need a session. Confirmed against the old build: `cross-origin`, against the new one: read and converted |
+| The 1320×300 cloud.ru header stays light | It is flat brand art (45 colours, 25% midtones, 68% light) but the class threshold was 32 colours, so it fell into `photo`, and the soft photo curve only pulls its mean to 0.55 | The flat-art threshold is 64 colours: the header is now `graphic` and its mean lands at 0.364. Real photographs keep hundreds of colours at the 40×40 grid (the cisterns photo: 132), so they are unaffected |
+| The runners illustration looks almost unchanged | Not a bug in this build: 79 colours and 47% midtones is a photograph by every measure, so the soft curve applies and the mean goes 0.672 → 0.361. Where it still reads light is the pale sky band — the soft curve never drives anything to black. Open question for the user: is that acceptable, or should photographs with a large flat light area get a stronger curve |
+
+Live ledger after the fix — feed: `35/1/{"small":28,"already-dark":6}` with `photo/132/0.48/1.00` on the tanks photo; article: `14/7/{"small":3,"already-dark":4}` with `graphic/45/0.25/1.00` on the header and `photo/79/0.47/1.00` on the runners. Screenshots: `docs/worklog/2026.11.02-smart-dark-extension/shots/` is unchanged for this round, the captures are in the user-facing comparison page.
+
+## Known limits (1.2.2)
 
 - A `.svg` picture is never converted: it is not decoded to pixels, and the page theme cannot recolour it either. Blog art delivered as SVG stays as drawn.
 - A site whose dark theme is painted by the page but never announced can still be measured as light; the announced-signal watch only covers attributes and added nodes.
+- A photograph with a large uniformly light region (an overcast sky, a white studio backdrop) keeps that region light: the soft photo curve compresses contrast instead of forcing a dark background.
+- A CDN that requires credentials *and* answers a wildcard origin is unreadable from a content script; such hosts now land in `cross-origin` only after both attempts fail.

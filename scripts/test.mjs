@@ -22,6 +22,8 @@ const check = (name, ok, detail = '') => {
 
 const TYPES = { '.html': 'text/html', '.png': 'image/png', '.jpg': 'image/jpeg', '.svg': 'image/svg+xml' };
 
+let corsPort = 0;
+
 function serve() {
   const server = http.createServer((req, res) => {
     const clean = decodeURIComponent(req.url.split('?')[0]);
@@ -30,9 +32,31 @@ function serve() {
       res.writeHead(404).end('not found');
       return;
     }
-    res.writeHead(200, { 'content-type': TYPES[path.extname(file)] || 'application/octet-stream' }).end(fs.readFileSync(file));
+    let body = fs.readFileSync(file);
+    if (file.endsWith('.html') && body.includes('__CORS__')) body = body.toString('utf8').replace('__CORS__', String(corsPort));
+    res.writeHead(200, { 'content-type': TYPES[path.extname(file)] || 'application/octet-stream' }).end(body);
   });
   return new Promise((resolve) => server.listen(0, '127.0.0.1', () => resolve(server)));
+}
+
+/* A second origin that answers `Access-Control-Allow-Origin: *`, the way habrastorage and fbcdn do. A request that
+   carries cookies is rejected by the browser against such a header, so this server is what catches that mistake. */
+function serveCdn() {
+  const server = http.createServer((req, res) => {
+    const file = path.join(fixtures, 'images', path.basename(decodeURIComponent(req.url.split('?')[0])));
+    if (!file.startsWith(fixtures) || !fs.existsSync(file)) {
+      res.writeHead(404).end('not found');
+      return;
+    }
+    res.writeHead(200, {
+      'content-type': TYPES[path.extname(file)] || 'application/octet-stream',
+      'access-control-allow-origin': '*',
+    }).end(fs.readFileSync(file));
+  });
+  return new Promise((resolve) => server.listen(0, '127.0.0.1', () => {
+    corsPort = server.address().port;
+    resolve(server);
+  }));
 }
 
 const scrollThrough = async (page) => {
@@ -64,6 +88,7 @@ async function waitFor(page, predicate, timeout = 15000) {
 }
 
 async function main() {
+  const cdn = await serveCdn();
   const server = await serve();
   const base = `http://127.0.0.1:${server.address().port}`;
 
@@ -216,7 +241,7 @@ async function main() {
     return done.length >= 3 ? done.map((i) => ({ kind: i.dataset.sdDone, info: i.dataset.sdInfo })) : null;
   }, 30000);
   const kinds = classes ? classes.map((c) => c.kind) : [];
-  check('images: photo, diagrams and logo classified separately', kinds.includes('photo') && kinds.filter((k) => k === 'graphic').length === 2, JSON.stringify(kinds));
+  check('images: photo, diagrams and logo classified separately', kinds.includes('photo') && kinds.filter((k) => k === 'graphic').length === 3, JSON.stringify(kinds));
   check('images: transparent logo treated as an icon', kinds.includes('icon'), JSON.stringify(kinds));
 
   const pixels = await images.evaluate(() => Array.from(document.images).filter((i) => i.dataset.sdDone).map((img) => {
@@ -245,6 +270,20 @@ async function main() {
     return img ? { skip: img.dataset.sdSkip || '', done: img.dataset.sdDone || '', source: img.dataset.sdSource || '' } : null;
   });
   check('images: an already dark photo is left alone', !!darkSkip && darkSkip.skip === 'already-dark' && !darkSkip.source, JSON.stringify(darkSkip));
+
+  // 4a. a CDN that allows any origin but not credentials: the bitmap must still be readable
+  const cdnPage = await context.newPage();
+  await cdnPage.goto(`${base}/images/cors.html`, { waitUntil: 'load' });
+  await scrollThrough(cdnPage);
+  const cdnResult = await waitFor(cdnPage, () => {
+    const img = document.querySelector('img');
+    if (!img) return null;
+    if (img.dataset.sdDone) return { done: img.dataset.sdDone, info: img.dataset.sdInfo || '' };
+    if (img.dataset.sdSkip) return { skip: img.dataset.sdSkip };
+    return null;
+  }, 30000);
+  check('images: a permissive CDN is read without credentials', !!cdnResult && cdnResult.done === 'graphic' && !cdnResult.skip, JSON.stringify(cdnResult));
+  await cdnPage.close();
 
   // 4b. a player that a site fix inverts must keep the clip un-inverted
   await setStorage({ darkSites: { '127.0.0.1': true }, imageSites: {} });
@@ -328,6 +367,7 @@ async function main() {
 
   await context.close();
   server.close();
+  cdn.close();
 
   const failed = results.filter((r) => !r.ok);
   console.log(`\n${results.length - failed.length}/${results.length} checks passed`);

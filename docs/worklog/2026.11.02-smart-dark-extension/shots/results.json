@@ -82,12 +82,12 @@
   {
     "name": "images: photo, diagrams and logo classified separately",
     "ok": true,
-    "detail": "[\"photo\",\"graphic\",\"graphic\",\"icon\"]"
+    "detail": "[\"photo\",\"graphic\",\"graphic\",\"graphic\",\"icon\"]"
   },
   {
     "name": "images: transparent logo treated as an icon",
     "ok": true,
-    "detail": "[\"photo\",\"graphic\",\"graphic\",\"icon\"]"
+    "detail": "[\"photo\",\"graphic\",\"graphic\",\"graphic\",\"icon\"]"
   },
   {
     "name": "images: photo keeps midtone range",
@@ -108,6 +108,11 @@
     "name": "images: an already dark photo is left alone",
     "ok": true,
     "detail": "{\"skip\":\"already-dark\",\"done\":\"\",\"source\":\"\"}"
+  },
+  {
+    "name": "images: a permissive CDN is read without credentials",
+    "ok": true,
+    "detail": "{\"done\":\"graphic\",\"info\":\"graphic/18/0.34/1.00\"}"
   },
   {
     "name": "video: forced theme is applied",

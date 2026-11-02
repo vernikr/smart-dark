@@ -113,6 +113,7 @@ async function main() {
   // 1. factory dark detection on well-known variants
   for (const [slug, expected, label] of [
     ['light', false, 'light page'],
+    ['simple-page', false, 'short contentful page'],
     ['dark-attribute', true, 'data-theme dark page'],
     ['dark-body-class', true, 'body.dark page'],
     ['dark-painted', true, 'page whose dark canvas is painted by gradients'],
@@ -127,6 +128,16 @@ async function main() {
       const bg = await page.evaluate(() => getComputedStyle(document.body).backgroundColor);
       check('detection: light page gets the theme without manual action', info && info.dark === true, bg);
       await page.screenshot({ path: path.join(shots, '10-light-fixture.png') });
+    }
+    if (slug === 'simple-page') {
+      const details = await page.evaluate(() => ({
+        height: document.body.clientHeight,
+        state: JSON.parse(document.documentElement.dataset.sdState || '{}'),
+      }));
+      check('detection: compact content is measured and themed', details.height < 32
+        && details.state.detected === true
+        && details.state.reason === 'measured-light'
+        && details.state.dark === true, JSON.stringify(details));
     }
     if (slug === 'dark-media') {
       await page.screenshot({ path: path.join(shots, '11-dark-hero.png') });

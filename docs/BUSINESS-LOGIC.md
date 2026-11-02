@@ -39,9 +39,14 @@ first.
 | 2 | `<html>` or `<body>` attribute from the dark list (`dark`, `dark-mode`, `data-theme="dark"`, `data-scheme`, `night`, `color-scheme`, …) holds `''`, `true`, `1` or a dark scheme word | `declared-dark` |
 | 3 | `<html>`/`<body>` class matches the dark word list (`dark`, `darkmode`, `dark-theme`, `night`, `theme-dark`, …) or the light list (`light`, `light-theme`, …) | `declared-dark` / `declared-light` |
 | 4 | No body yet | `no-body` — nothing claimed, retried later |
-| 5 | Body is effectively empty (no element children, or height < 32 px) | `not-ready` — nothing claimed, retried later |
-| 6 | A shell: no more than 16 elements in the body **and** a light canvas | `skeleton` — nothing claimed, retried later; the system preference is reported in the meantime |
+| 5 | Body has no element children, or is under 32 px tall without substantive visible text | `not-ready` — nothing claimed, retried later |
+| 6 | A shell: no more than 16 elements in the body, a light canvas, and no substantive visible text | `skeleton` — nothing claimed, retried later; the system preference is reported in the meantime |
 | 7 | Measurement over the page | `measured-dark` / `measured-light` |
+
+**Compact pages.** Geometry alone cannot distinguish an unfinished shell from a complete short document. Visible semantic text
+(headings, paragraphs, list items, quotations, preformatted text and captions) of at least 12 characters is usable content;
+otherwise distinct visible lines need 24 characters in total. Obvious loading placeholders do not count. Such content bypasses
+both the short-body and shallow-shell guards, so a compact light page is measured instead of remaining unrecognised.
 
 **Measurement.** The page is sampled at up to 4×4 points of the viewport plus up to 48 text elements (`h1, h2, p, li,
 span, a, button`). For each sample the module takes, in order: the element's own opaque background colour, then the

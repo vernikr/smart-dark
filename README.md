@@ -2,7 +2,7 @@
 
 Chrome/Edge extension that darkens light websites and darkens large images without losing their colours.
 
-- **Site layer.** Detects whether a site already ships a dark theme — from what the site declares (`<html dark>`, `body.dark`, `data-theme`, `color-scheme`) and from what it paints (canvas and element colours, gradients, text). Light sites are darkened automatically; sites that are dark already are left alone. The switch `Затемнять сайт <domain>` overrides the detection and is remembered per site.
+- **Site layer.** Detects whether a site already ships a dark theme — from what the site declares (`<html dark>`, `body.dark`, `data-theme`, `color-scheme`) and from what it paints (canvas and element colours, gradients, text). Compact pages with meaningful visible text are measured too; only genuinely empty or placeholder shells are deferred. Light sites are darkened automatically; sites that are dark already are left alone. The switch `Затемнять сайт <domain>` overrides the detection and is remembered per site.
 - **Image layer.** Large pictures (article art, landing illustrations, diagrams, photos, transparent logos and icons) are re-toned so they sit on a dark page. Hue, saturation and transparency are preserved. Bright flat art is remapped into a dark band by inverting its polarity; a photograph is darkened without inversion; dark art that a flip would turn into a light page is darkened instead, and a picture that is already dark is not touched. The layer is **on for every site by default**; the switch `Затемнять изображения на <domain>` turns it off for one site and is remembered.
 
 Both switches live in the toolbar popup. There are no other settings.

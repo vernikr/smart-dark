@@ -260,11 +260,28 @@
     return (1 - bodyColor.a) * base + bodyColor.a * lightness(bodyColor) >= 0.5;
   }
 
+  /* A compact document can be complete even when its box is shorter than the viewport heuristics expect. */
+  function hasSubstantiveContent() {
+    const body = document.body;
+    if (!body) return false;
+    const isPlaceholder = (text) => /^(loading(?:\b|[.…]*)|please wait\b|initializing\b|skeleton\b)/i.test(text);
+    const semanticBlocks = body.querySelectorAll('h1,h2,h3,h4,h5,h6,p,li,blockquote,pre,figcaption,dt,dd');
+    for (const element of semanticBlocks) {
+      if (!element.getClientRects().length) continue;
+      const text = (element.innerText || element.textContent || '').replace(/\s+/g, ' ').trim();
+      if (text.length >= 12 && !isPlaceholder(text)) return true;
+    }
+    const lines = Array.from(new Set((body.innerText || '').split(/\n+/)
+      .map((line) => line.replace(/\s+/g, ' ').trim())
+      .filter((line) => line && !isPlaceholder(line))));
+    return lines.join(' ').length >= 24;
+  }
+
   /* An application shell lays out a few empty boxes before the real surface exists: a light body with no content yet is
      not evidence that the site is light, and such a verdict used to stick for the whole session (Gmail). */
   function looksLikeSkeleton() {
     const body = document.body;
-    if (!body) return false;
+    if (!body || hasSubstantiveContent()) return false;
     const elements = body.querySelectorAll('*');
     if (elements.length > SKELETON_MAX_ELEMENTS) return false;
     const canvas = canvasVote();
@@ -297,7 +314,8 @@
   function ready() {
     const body = document.body;
     if (!body) return false;
-    if (body.childElementCount === 0 || body.clientHeight < 32) return false;
+    if (body.childElementCount === 0) return false;
+    if (body.clientHeight < 32 && !hasSubstantiveContent()) return false;
     for (const child of body.children) {
       const tag = child.tagName;
       if (tag !== 'SCRIPT' && tag !== 'STYLE' && tag !== 'LINK') return true;

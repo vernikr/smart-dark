@@ -1,0 +1,18 @@
+{
+  "name": "smart-dark",
+  "displayName": "Smart Dark",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Dark theme for sites that lack one, plus smart dark conversion of large images",
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "test": "node scripts/test.mjs",
+    "shot": "node scripts/shot.mjs",
+    "sync-fixes": "node scripts/sync-fixes.mjs"
+  },
+  "devDependencies": {
+    "darkreader": "4.9.134",
+    "playwright": "1.64.1"
+  }
+}

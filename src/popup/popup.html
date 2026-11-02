@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <title>Smart Dark</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <header class="head">
+    <span class="head__icon"></span>
+    <div class="head__text">
+      <strong id="site">site</strong>
+      <span id="status" class="head__status"></span>
+    </div>
+  </header>
+
+  <main id="rows" class="rows" aria-busy="true">
+    <label class="row" id="row-dark">
+      <span class="row__label" id="label-dark">Затемнять сайт</span>
+      <input type="checkbox" id="toggle-dark" role="switch">
+      <span class="row__switch" aria-hidden="true"></span>
+    </label>
+    <label class="row" id="row-images">
+      <span class="row__label" id="label-images">Затемнять изображения</span>
+      <input type="checkbox" id="toggle-images" role="switch">
+      <span class="row__switch" aria-hidden="true"></span>
+    </label>
+    <p class="note" id="note" hidden></p>
+  </main>
+
+  <footer class="foot">
+    <span class="foot__hint" id="native-hint" hidden>У сайта есть своя тёмная тема</span>
+    <button class="foot__link" id="redetect" type="button" hidden>Проверить снова</button>
+  </footer>
+
+  <script src="popup.js"></script>
+</body>
+</html>

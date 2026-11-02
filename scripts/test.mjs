@@ -1,0 +1,235 @@
+/**
+ * End-to-end suite: loads the built extension in Chromium and checks detection,
+ * theme toggles, persistence and image conversion on local fixtures and live sites.
+ */
+import { chromium } from 'playwright';
+import http from 'node:http';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const ext = path.join(root, 'dist');
+const fixtures = path.join(root, 'fixtures');
+const shots = path.join(root, 'docs/worklog/2026.11.02-smart-dark-extension/shots');
+fs.mkdirSync(shots, { recursive: true });
+
+const results = [];
+const check = (name, ok, detail = '') => {
+  results.push({ name, ok, detail });
+  console.log(`${ok ? 'PASS' : 'FAIL'} ${name}${detail ? ' — ' + detail : ''}`);
+};
+
+const TYPES = { '.html': 'text/html', '.png': 'image/png', '.jpg': 'image/jpeg', '.svg': 'image/svg+xml' };
+
+function serve() {
+  const server = http.createServer((req, res) => {
+    const clean = decodeURIComponent(req.url.split('?')[0]);
+    const file = path.join(fixtures, clean.endsWith('/') ? path.join(clean, 'index.html') : clean);
+    if (!file.startsWith(fixtures) || !fs.existsSync(file) || fs.statSync(file).isDirectory()) {
+      res.writeHead(404).end('not found');
+      return;
+    }
+    res.writeHead(200, { 'content-type': TYPES[path.extname(file)] || 'application/octet-stream' }).end(fs.readFileSync(file));
+  });
+  return new Promise((resolve) => server.listen(0, '127.0.0.1', () => resolve(server)));
+}
+
+const scrollThrough = async (page) => {
+  await page.addStyleTag({ content: 'html{scroll-behavior:auto !important}' }).catch(() => {});
+  await page.evaluate(async () => {
+    const height = Math.max(document.body.scrollHeight, document.documentElement.scrollHeight);
+    for (let y = 0; y < height; y += 400) {
+      window.scrollTo(0, y);
+      document.documentElement.scrollTop = y;
+      document.body.scrollTop = y;
+      await new Promise((r) => setTimeout(r, 220));
+    }
+  });
+};
+
+const state = (page) => page.evaluate(() => {
+  const raw = document.documentElement.dataset.sdState;
+  return raw ? JSON.parse(raw) : null;
+});
+
+async function waitFor(page, predicate, timeout = 15000) {
+  const started = Date.now();
+  while (Date.now() - started < timeout) {
+    const value = await page.evaluate(predicate);
+    if (value) return value;
+    await page.waitForTimeout(300);
+  }
+  return null;
+}
+
+async function main() {
+  const server = await serve();
+  const base = `http://127.0.0.1:${server.address().port}`;
+
+  const context = await chromium.launchPersistentContext('', {
+    channel: 'chromium',
+    headless: true,
+    viewport: { width: 900, height: 1100 },
+    args: [`--disable-extensions-except=${ext}`, `--load-extension=${ext}`],
+  });
+  const worker = context.serviceWorkers()[0] || await context.waitForEvent('serviceworker');
+  const extId = worker.url().split('/')[2];
+  const setStorage = (value) => worker.evaluate((v) => chrome.storage.local.set(v), value);
+
+  // 0. warm-up: the first document after a fresh install can miss the content script
+  const warmup = await context.newPage();
+  await warmup.goto(`${base}/light/`, { waitUntil: 'load' });
+  await waitFor(warmup, () => document.documentElement.dataset.sdState !== undefined, 8000);
+  await warmup.reload({ waitUntil: 'load' });
+  await waitFor(warmup, () => document.documentElement.dataset.sdState !== undefined, 8000);
+  await warmup.close();
+
+  // 1. factory dark detection on well-known variants
+  for (const [slug, expected, label] of [
+    ['light', false, 'light page'],
+    ['dark-attribute', true, 'data-theme dark page'],
+    ['dark-media', false, 'page with a dark hero only'],
+  ]) {
+    await setStorage({ darkSites: {}, imageSites: {} });
+    const page = await context.newPage();
+    await page.goto(`${base}/${slug}/`, { waitUntil: 'load' });
+    const info = await waitFor(page, () => (document.documentElement.dataset.sdState ? JSON.parse(document.documentElement.dataset.sdState) : null));
+    check(`detection: ${label}`, info && info.factoryDark === expected, JSON.stringify(info));
+    if (slug === 'light') {
+      const bg = await page.evaluate(() => getComputedStyle(document.body).backgroundColor);
+      check('detection: light page gets the theme without manual action', info && info.dark === true, bg);
+      await page.screenshot({ path: path.join(shots, '10-light-fixture.png') });
+    }
+    if (slug === 'dark-media') {
+      await page.screenshot({ path: path.join(shots, '11-dark-hero.png') });
+    }
+    await page.close();
+  }
+
+  // 2. live site with its own dark theme
+  await setStorage({ darkSites: {}, imageSites: {} });
+  const kiro = await context.newPage();
+  await kiro.goto('https://kiro.dev/blog/software-factory-stability/', { waitUntil: 'domcontentloaded', timeout: 60000 }).catch(() => null);
+  if (kiro.url().includes('kiro.dev')) {
+    const info = await waitFor(kiro, () => (document.documentElement.dataset.sdState ? JSON.parse(document.documentElement.dataset.sdState) : null));
+    check('live: native dark blog detected', info && info.factoryDark === true, JSON.stringify(info));
+    check('live: theme stays off on native dark blog', info && info.dark === false);
+  } else {
+    check('live: native dark blog detected', false, 'site unreachable from the sandbox');
+  }
+
+  // 3. image conversion on the same native dark site
+  await setStorage({ darkSites: {}, imageSites: { 'kiro.dev': true } });
+  if (kiro.url().includes('kiro.dev')) {
+    await kiro.reload({ waitUntil: 'domcontentloaded' });
+    await scrollThrough(kiro);
+    await kiro.waitForTimeout(1500);
+    await scrollThrough(kiro);
+    const trace = await kiro.evaluate(() => (window.__sdTrace || []).slice(-14));
+    const queue = await kiro.evaluate(() => Array.from(document.images).map((i) => ({ b: i.dataset.sdBusy || '', l: i.dataset.sdLocked || '', q: i.dataset.sdQueued || '', k: i.dataset.sdSkip || '' })));
+    console.log('trace:', JSON.stringify(trace), 'queue:', JSON.stringify(queue));
+    const diagnostics = await kiro.evaluate(() => Array.from(document.images).map((i) => ({
+      src: (i.currentSrc || i.src).slice(-24), tracked: i.dataset.sdTracked || '', queued: i.dataset.sdQueued || '',
+      done: i.dataset.sdDone || '', skip: i.dataset.sdSkip || '',
+      box: `${Math.round(i.getBoundingClientRect().width)}x${Math.round(i.getBoundingClientRect().height)}`,
+    })));
+    await kiro.waitForTimeout(6000);
+    const converted = await waitFor(kiro, () => {
+      const done = Array.from(document.images).filter((i) => i.dataset.sdDone && i.dataset.sdDone !== 'skip-dark');
+      return done.length >= 3 ? done.map((i) => ({ kind: i.dataset.sdDone, info: i.dataset.sdInfo })) : null;
+    }, 30000);
+    check('live: article diagrams converted on a native dark site', !!converted, JSON.stringify(converted) + ' | ' + JSON.stringify(diagnostics));
+    const firstConverted = kiro.locator('img[data-sd-done]').first();
+    if (await firstConverted.count()) {
+      await firstConverted.scrollIntoViewIfNeeded();
+      await kiro.waitForTimeout(700);
+      await kiro.screenshot({ path: path.join(shots, '12-kiro-images.png') });
+    }
+  }
+
+  // 4. image classes on the fixture
+  await setStorage({ darkSites: {}, imageSites: { '127.0.0.1': true } });
+  const images = await context.newPage();
+  await images.goto(`${base}/images/`, { waitUntil: 'load' });
+  await scrollThrough(images);
+  const classes = await waitFor(images, () => {
+    const done = Array.from(document.images).filter((i) => i.dataset.sdDone);
+    return done.length >= 3 ? done.map((i) => ({ kind: i.dataset.sdDone, info: i.dataset.sdInfo })) : null;
+  }, 30000);
+  const kinds = classes ? classes.map((c) => c.kind) : [];
+  check('images: photo, diagrams and logo classified separately', kinds.includes('photo') && kinds.filter((k) => k === 'graphic').length === 2, JSON.stringify(kinds));
+  check('images: transparent logo treated as an icon', kinds.includes('icon'), JSON.stringify(kinds));
+
+  const pixels = await images.evaluate(() => Array.from(document.images).filter((i) => i.dataset.sdDone).map((img) => {
+    const canvas = document.createElement('canvas');
+    canvas.width = img.naturalWidth;
+    canvas.height = img.naturalHeight;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(img, 0, 0);
+    const data = ctx.getImageData(0, 0, canvas.width, Math.min(300, canvas.height)).data;
+    let sum = 0;
+    let count = 0;
+    for (let i = 0; i < data.length; i += 4) {
+      sum += 0.2126 * data[i] + 0.7152 * data[i + 1] + 0.0722 * data[i + 2];
+      count++;
+    }
+    return { kind: img.dataset.sdDone, mean: Math.round(sum / count), alpha: ctx.getImageData(0, 0, 4, 4).data[3] };
+  }));
+  const photo = pixels.find((p) => p.kind === 'photo');
+  const graphic = pixels.find((p) => p.kind === 'graphic');
+  const icon = pixels.find((p) => p.kind === 'icon');
+  check('images: photo keeps midtone range', photo && photo.mean > 80 && photo.mean < 165, JSON.stringify(photo));
+  check('images: diagram background moved into the dark band', graphic && graphic.mean < 70, JSON.stringify(graphic));
+  check('images: icon transparency preserved', icon && icon.alpha === 0, JSON.stringify(icon));
+  await images.screenshot({ path: path.join(shots, '13-image-classes.png'), fullPage: true });
+
+  // 5. toggles, persistence and popup on the light fixture
+  await setStorage({ darkSites: {}, imageSites: {} });
+  const site = await context.newPage();
+  await site.goto(`${base}/light/`, { waitUntil: 'load' });
+  await waitFor(site, () => document.documentElement.dataset.sdState);
+  const popup = await context.newPage();
+  await popup.goto(`chrome-extension://${extId}/popup.html`);
+  await site.bringToFront();
+  await popup.reload();
+  await popup.waitForTimeout(1500);
+  const popupText = await popup.evaluate(() => document.body.innerText.replace(/\s+/g, ' ').trim());
+  check('popup targets the active site', /127\.0\.0\.1/.test(popupText), popupText.slice(0, 90));
+  const labels = await popup.evaluate(() => [document.getElementById('label-dark').textContent, document.getElementById('label-images').textContent]);
+  check('popup uses the requested labels', /Затемнять сайт/.test(labels[0]) && /Затемнять изображения/.test(labels[1]), JSON.stringify(labels));
+  const initial = await popup.evaluate(() => ({ dark: document.getElementById('toggle-dark').checked, images: document.getElementById('toggle-images').checked }));
+  check('popup reflects the auto-enabled theme', initial.dark === true && initial.images === false, JSON.stringify(initial));
+  await popup.screenshot({ path: path.join(shots, '14-popup-on.png') });
+
+  await popup.click('#row-dark');
+  await popup.waitForTimeout(1200);
+  const stored = await worker.evaluate(() => chrome.storage.local.get({ darkSites: {}, imageSites: {} }));
+  check('dark switch state is persisted', stored.darkSites['127.0.0.1'] === false, JSON.stringify(stored.darkSites));
+  await popup.click('#row-images');
+  await popup.waitForTimeout(1200);
+  const stored2 = await worker.evaluate(() => chrome.storage.local.get({ darkSites: {}, imageSites: {} }));
+  check('image switch state is persisted', stored2.imageSites['127.0.0.1'] === true, JSON.stringify(stored2.imageSites));
+
+  await popup.reload();
+  await popup.waitForTimeout(1200);
+  const restored = await popup.evaluate(() => ({ dark: document.getElementById('toggle-dark').checked, images: document.getElementById('toggle-images').checked }));
+  check('popup restores saved switch states', restored.dark === false && restored.images === true, JSON.stringify(restored));
+
+  await site.waitForTimeout(800);
+  check('site layer follows the switch', (await state(site)).dark === false, JSON.stringify(await state(site)));
+  await popup.screenshot({ path: path.join(shots, '15-popup-off.png') });
+
+  await context.close();
+  server.close();
+
+  const failed = results.filter((r) => !r.ok);
+  console.log(`\n${results.length - failed.length}/${results.length} checks passed`);
+  fs.writeFileSync(path.join(shots, 'results.json'), JSON.stringify(results, null, 2));
+  process.exit(failed.length ? 1 : 0);
+}
+
+main().catch((err) => {
+  console.error('test crashed:', err);
+  process.exit(2);
+});

@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Image classes</title>
+  <style>
+    body { margin: 0; background: #fff; color: #14161a; font: 16px/1.6 system-ui, sans-serif; }
+    main { max-width: 760px; margin: 0 auto; padding: 48px 24px 96px; }
+    figure { margin: 0 0 40px; }
+    figure img { width: 100%; height: auto; display: block; border-radius: 8px; }
+    figcaption { color: #6b7280; font-size: 13px; margin-top: 8px; }
+    .row { display: flex; gap: 24px; align-items: center; }
+    .row img { width: 640px; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Image classes</h1>
+    <figure><img src="photo.jpg" alt="Photo"><figcaption>Photo</figcaption></figure>
+    <figure><img src="diagram.png" alt="Diagram"><figcaption>Diagram</figcaption></figure>
+    <figure><img src="chart.png" alt="Chart"><figcaption>Chart</figcaption></figure>
+    <div class="row"><img src="logo.png" alt="Logo"><p>Transparent logo</p></div>
+  </main>
+</body>
+</html>

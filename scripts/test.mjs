@@ -155,11 +155,13 @@ async function main() {
       box: `${Math.round(i.getBoundingClientRect().width)}x${Math.round(i.getBoundingClientRect().height)}`,
     })));
     await kiro.waitForTimeout(6000);
-    const converted = await waitFor(kiro, () => {
-      const done = Array.from(document.images).filter((i) => i.dataset.sdDone && i.dataset.sdDone !== 'skip-dark');
-      return done.length >= 3 ? done.map((i) => ({ kind: i.dataset.sdDone, info: i.dataset.sdInfo })) : null;
+    const ledger = await waitFor(kiro, () => {
+      const raw = document.documentElement.dataset.sdImages;
+      if (!raw) return null;
+      const [started, converted, reasons] = raw.split('/');
+      return Number(converted) >= 1 ? { started: Number(started), converted: Number(converted), reasons: JSON.parse(reasons) } : null;
     }, 30000);
-    check('live: article diagrams converted on a native dark site', !!converted, JSON.stringify(converted));
+    check('live: article diagrams converted on a native dark site', !!ledger, ledger ? JSON.stringify(ledger) : 'no conversion');
     check('live: no image left in a failed state', !diagnostics.some((d) => d.skip && d.skip !== 'already-dark'), JSON.stringify(diagnostics.filter((d) => d.skip)));
     const firstConverted = kiro.locator('img[data-sd-done]').first();
     if (await firstConverted.count()) {
@@ -247,6 +249,22 @@ async function main() {
   });
   check('video: an inverted player wrapper does not invert the clip', /invert/.test(filters.player) && filters.video === 'none', JSON.stringify(filters));
   await player.close();
+
+  // 4c. the same player on a site that announces its own dark theme: the forced layer must not reuse light-site fixes
+  const ownDark = await context.newPage();
+  await ownDark.goto(`${base}/dark-media/`, { waitUntil: 'load' });
+  await ownDark.evaluate(() => {
+    const wrapper = document.createElement('div');
+    wrapper.className = 'html5-video-player';
+    wrapper.id = 'own-dark-player';
+    wrapper.style.cssText = 'width:320px;height:180px;background:#000';
+    document.querySelector('main').appendChild(wrapper);
+  });
+  await waitFor(ownDark, () => document.documentElement.dataset.sdState);
+  await ownDark.waitForTimeout(800);
+  const ownDarkFilter = await ownDark.evaluate(() => getComputedStyle(document.getElementById('own-dark-player')).filter);
+  check('video: a native dark site keeps its player un-inverted', ownDarkFilter === 'none', ownDarkFilter);
+  await ownDark.close();
   await images.screenshot({ path: path.join(shots, '13-image-classes.png'), fullPage: true });
 
   // 5. toggles, persistence and popup on the light fixture

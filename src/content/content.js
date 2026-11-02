@@ -32,17 +32,25 @@
     selectionColor: 'auto',
     styleSystemControls: true,
     // Irreplaceable media: the theme must never paint over video, canvas or the player chrome.
-    ignoreImageAnalysis: ['video', 'canvas', 'picture', 'iframe'],
+    ignoreImageAnalysis: ['video', 'canvas', 'picture', 'iframe', '.html5-video-player'],
   };
 
   const MEDIA_SAFE = THEME.ignoreImageAnalysis;
+
+  /* Fix lists are written for sites that ship no dark theme of their own; once a site declares dark, its own player
+     and artwork are already correct, so those fixes are dropped instead of being layered on top. */
+  function fixesFor(factoryDark) {
+    if (factoryDark === true) return { invert: [], ignore: state.fixes.ignore };
+    return state.fixes;
+  }
 
   function applyTheme(on) {
     if (!window.DarkReader || state.darkApplied === on) return;
     try {
       if (on) {
-        const ignore = [...MEDIA_SAFE, ...state.fixes.ignore];
-        window.DarkReader.enable(THEME, { invert: state.fixes.invert, ignoreImageAnalysis: ignore });
+        const fixes = fixesFor(state.factoryDark);
+        const ignore = [...MEDIA_SAFE, ...fixes.ignore];
+        window.DarkReader.enable(THEME, { invert: fixes.invert, ignoreImageAnalysis: ignore });
       } else {
         window.DarkReader.disable();
       }
@@ -115,6 +123,7 @@
       const factoryDark = state.factoryDark;
 
       const wantTheme = forced === true ? true : forced === false ? false : factoryDark !== true;
+      // A site with its own dark theme keeps it: the forced layer only corrects that site's remaining light corners.
       applyTheme(wantTheme);
       if (window.WD.imagesEnabled(settings, key)) startImages();
       else stopImages();

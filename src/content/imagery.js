@@ -12,6 +12,8 @@
   const MAX_SIDE = 2200;
   const IMAGE_TIMEOUT_MS = 10000;
   const VISIBILITY_RETRIES = 4;
+  const PREFETCH_MARGIN = '2400px';
+  const CONCURRENCY = 3;
   const VISIBILITY_RETRY_MS = 700;
   const LIGHT_PIXEL_LUMA = 0.5;
   const MIN_LIGHT_SHARE = 0.25;
@@ -182,7 +184,7 @@
       this.cache = new Map();
       this.handled = new WeakMap();
       this.queue = [];
-      this.busy = false;
+      this.running = 0;
     }
 
     claim(img, url) {
@@ -222,28 +224,45 @@
       if (img.dataset.sdDone || img.dataset.sdQueued) return;
       img.dataset.sdQueued = '1';
       this.queue.push(img);
-      if (!this.busy) this.drain();
+      this.drain();
     }
 
-    async drain() {
-      this.busy = true;
-      while (this.queue.length) {
-        const img = this.queue.shift();
-        const timeout = new Promise((resolve) => setTimeout(() => resolve('timeout'), IMAGE_TIMEOUT_MS));
-        try {
-          const outcome = await Promise.race([this.process(img), timeout]);
-          if (outcome === 'timeout') img.dataset.sdSkip = 'timeout';
-        } catch (err) {
-          img.dataset.sdSkip = err && err.message ? err.message : 'error';
-        }
+    /* A single large picture used to hold the whole queue; a few conversions now run side by side. */
+    drain() {
+      while (this.running < CONCURRENCY && this.queue.length) {
+        this.running++;
+        this.run(this.queue.shift()).finally(() => {
+          this.running--;
+          this.drain();
+        });
       }
-      this.busy = false;
+    }
+
+    async run(img) {
+      const timeout = new Promise((resolve) => setTimeout(() => resolve('timeout'), IMAGE_TIMEOUT_MS));
+      ledger.started++;
+      try {
+        const outcome = await Promise.race([this.process(img), timeout]);
+        if (outcome === 'timeout') img.dataset.sdSkip = 'timeout';
+      } catch (err) {
+        img.dataset.sdSkip = err && err.message ? err.message : 'error';
+      }
+      if (img.dataset.sdDone) {
+        ledger.converted++;
+        ledger.kinds[img.dataset.sdDone] = (ledger.kinds[img.dataset.sdDone] || 0) + 1;
+      } else {
+        ledger.skipped++;
+        const reason = img.dataset.sdSkip || 'unprocessed';
+        ledger.reasons[reason] = (ledger.reasons[reason] || 0) + 1;
+      }
+      publishLedger();
+      delete img.dataset.sdPending;
     }
 
     async process(img) {
       if (!img.isConnected) return;
       const url = img.currentSrc || img.src;
-      if (!url || url.startsWith('blob:') || url.startsWith('data:image/svg') || /\.svg(\?|#|$)/i.test(url)) return;
+      if (!url || url.startsWith('data:image/svg') || /\.svg(\?|#|$)/i.test(url)) return;
       if (!this.isLarge(img)) return;
       // Images that fade in or mount late are retried shortly instead of being dropped.
       if (!this.isVisible(img)) {
@@ -257,14 +276,23 @@
       if (!this.claim(img, url)) return;
       if (this.matches(img, this.selectors.ignore)) { img.dataset.sdSkip = 'ignore'; return; }
 
+      // Lazy loaders hand out private object URLs that cannot be fetched again; the element itself is then the source.
+      const element = url.startsWith('blob:') ? img : null;
+      if (element && !(img.complete && img.naturalWidth)) { img.dataset.sdSkip = 'not-loaded'; return; }
+
       const soft = this.matches(img, this.selectors.invert);
+      // Faded out while the replacement is prepared, so a fast scroll never shows the light original.
+      img.dataset.sdPending = '1';
       const key = `${url}|${soft ? 'soft' : 'auto'}`;
       let entry = this.cache.get(key);
       if (!entry) {
-        entry = await this.build(url, soft);
+        entry = await this.build(url, soft, element);
         this.cache.set(key, entry);
       }
-      if (!entry || !entry.url) { img.dataset.sdSkip = (entry && entry.reason) || 'unprocessed'; return; }
+      if (!entry || !entry.url) {
+        img.dataset.sdSkip = (entry && entry.reason) || 'unprocessed';
+        return;
+      }
 
       img.dataset.sdSource = url;
       img.dataset.sdLocked = '1';
@@ -276,10 +304,10 @@
       img.src = entry.url;
     }
 
-    async build(url, soft) {
+    async build(url, soft, element) {
       let bitmap;
       try {
-        bitmap = await loadBitmap(url);
+        bitmap = element || await loadBitmap(url);
       } catch (err) {
         return { reason: 'cross-origin' };
       }
@@ -331,6 +359,7 @@
       delete img.dataset.sdLocked;
       delete img.dataset.sdSource;
       delete img.dataset.sdAttempts;
+      delete img.dataset.sdPending;
       img.style.removeProperty('filter');
       if (srcset) {
         img.srcset = srcset;
@@ -342,8 +371,33 @@
 
   let stopper = null;
 
+  /* Counters for diagnostics: marker attributes do not survive in-place image swaps, these do. They are mirrored into
+     `data-sd-images` on <html> so the page and the tests can read them without touching the isolated world. */
+  const ledger = { started: 0, converted: 0, skipped: 0, kinds: {}, reasons: {} };
+
+  function publishLedger() {
+    const target = document.documentElement;
+    if (target) target.dataset.sdImages = `${ledger.started}/${ledger.converted}/${JSON.stringify(ledger.reasons)}`;
+  }
+
+  const PENDING_CSS = 'img[data-sd-pending]{opacity:.25!important;transition:opacity .12s linear}';
+
+  function mountStyle() {
+    if (document.getElementById('smart-dark-images')) return;
+    const style = document.createElement('style');
+    style.id = 'smart-dark-images';
+    style.textContent = PENDING_CSS;
+    (document.head || document.documentElement).appendChild(style);
+  }
+
+  function unmountStyle() {
+    const style = document.getElementById('smart-dark-images');
+    if (style) style.remove();
+  }
+
   function start(options) {
     if (stopper) return Promise.resolve();
+    mountStyle();
     const processor = new Processor(options.selectors);
     let active = true;
     const seen = new WeakSet();
@@ -361,7 +415,7 @@
           consider(entry.target);
         }
       });
-    }, { rootMargin: '600px' });
+    }, { rootMargin: PREFETCH_MARGIN });
 
     const track = () => {
       document.querySelectorAll('img').forEach((img) => {
@@ -428,6 +482,7 @@
 
     stopper = () => {
       active = false;
+      unmountStyle();
       observer.disconnect();
       mutations.disconnect();
       sourceWatcher.disconnect();

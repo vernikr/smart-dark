@@ -53,6 +53,139 @@
     return state.fixes.invert.filter((selector) => !MEDIA_CONTAINER.test(selector));
   }
 
+  const INLINE_BG_COLOR = 'var(--darkreader-inline-bgcolor)';
+  const inlineBackgroundOverrides = new Map();
+  let inlineBackgroundObserver = null;
+
+  function restoreInlineBackground(element, original) {
+    const properties = [
+      'background', 'background-color', 'background-image', 'background-position',
+      'background-position-x', 'background-position-y', 'background-size', 'background-repeat',
+      'background-attachment', 'background-origin', 'background-clip',
+    ];
+    properties.forEach((property) => element.style.removeProperty(property));
+    original.declarations.forEach(({ property, value, priority }) => element.style.setProperty(property, value, priority));
+  }
+
+  function readInlineBackground(element) {
+    const source = element.getAttribute('style') || '';
+    const declarations = [];
+    let start = 0;
+    let depth = 0;
+    let quote = '';
+    let escaped = false;
+    const add = (end) => {
+      const declaration = source.slice(start, end);
+      const colon = declaration.indexOf(':');
+      if (colon <= 0) return;
+      const property = declaration.slice(0, colon).trim().toLowerCase();
+      if (property !== 'background' && !property.startsWith('background-')) return;
+      let value = declaration.slice(colon + 1).trim();
+      let priority = '';
+      const important = value.toLowerCase().lastIndexOf('!important');
+      if (important >= 0 && !value.slice(important + 10).trim()) {
+        value = value.slice(0, important).trim();
+        priority = 'important';
+      }
+      declarations.push({ property, value, priority });
+    };
+    for (let i = 0; i < source.length; i++) {
+      const char = source[i];
+      if (escaped) { escaped = false; continue; }
+      if (char === '\\') { escaped = true; continue; }
+      if (quote) { if (char === quote) quote = ''; continue; }
+      if (char === '"' || char === "'") { quote = char; continue; }
+      if (char === '(' || char === '[') depth++;
+      else if (char === ')' || char === ']') depth = Math.max(0, depth - 1);
+      else if (char === ';' && depth === 0) { add(i); start = i + 1; }
+    }
+    add(source.length);
+    return { declarations, applied: '' };
+  }
+
+  function restoreInlineBackgroundOverrides() {
+    for (const [element, original] of inlineBackgroundOverrides) restoreInlineBackground(element, original);
+    inlineBackgroundOverrides.clear();
+  }
+
+  function updateInlineBackground(element) {
+    if (!(element instanceof Element) || !element.style) return;
+    const original = inlineBackgroundOverrides.get(element);
+    const hasDarkReaderColor = element.hasAttribute('data-darkreader-inline-bgcolor');
+    const value = element.style.getPropertyValue('background-color').trim();
+    const priority = element.style.getPropertyPriority('background-color');
+    if (!hasDarkReaderColor) {
+      if (original) {
+        if (value === original.applied && priority === 'important') restoreInlineBackground(element, original);
+        inlineBackgroundOverrides.delete(element);
+      }
+      return;
+    }
+    if (original && value === original.applied && priority === 'important') return;
+    const backgroundPriority = element.style.getPropertyPriority('background');
+    if (!original && priority !== 'important' && backgroundPriority !== 'important') return;
+    if (original && priority !== 'important' && backgroundPriority !== 'important') {
+      inlineBackgroundOverrides.delete(element);
+      return;
+    }
+    const saved = original || readInlineBackground(element);
+    inlineBackgroundOverrides.set(element, saved);
+    element.style.setProperty('background-color', INLINE_BG_COLOR, 'important');
+    const converted = getComputedStyle(element).backgroundColor;
+    if (!/^rgba?\(/.test(converted)) {
+      restoreInlineBackground(element, saved);
+      inlineBackgroundOverrides.delete(element);
+      return;
+    }
+    saved.applied = converted;
+    element.style.setProperty('background-color', converted, 'important');
+  }
+
+  function updateInlineBackgrounds(root) {
+    if (!(root instanceof Element)) return;
+    if (root.matches('[data-darkreader-inline-bgcolor]')) updateInlineBackground(root);
+    root.querySelectorAll('[data-darkreader-inline-bgcolor]').forEach(updateInlineBackground);
+  }
+
+  function cleanDetachedInlineBackgrounds(root) {
+    if (!(root instanceof Element)) return;
+    const elements = [root, ...root.querySelectorAll('*')];
+    for (const element of elements) {
+      if (element.isConnected) continue;
+      const original = inlineBackgroundOverrides.get(element);
+      if (!original) continue;
+      restoreInlineBackground(element, original);
+      inlineBackgroundOverrides.delete(element);
+    }
+  }
+
+  function watchInlineImportantBackgrounds() {
+    if (!inlineBackgroundObserver) {
+      inlineBackgroundObserver = new MutationObserver((records) => {
+        for (const record of records) {
+          if (record.type === 'attributes') updateInlineBackground(record.target);
+          else {
+            record.removedNodes.forEach(cleanDetachedInlineBackgrounds);
+            record.addedNodes.forEach(updateInlineBackgrounds);
+          }
+        }
+      });
+      inlineBackgroundObserver.observe(document.documentElement, {
+        attributes: true,
+        attributeFilter: ['style', 'data-darkreader-inline-bgcolor'],
+        childList: true,
+        subtree: true,
+      });
+    }
+    updateInlineBackgrounds(document.documentElement);
+  }
+
+  function stopWatchingInlineImportantBackgrounds() {
+    if (!inlineBackgroundObserver) return;
+    inlineBackgroundObserver.disconnect();
+    inlineBackgroundObserver = null;
+  }
+
   function applyTheme(on) {
     if (!window.DarkReader) return;
     const fixes = fixesFor(state.factoryDark);
@@ -64,8 +197,14 @@
       if (on) {
         const ignore = [...MEDIA_SAFE, ...fixes.ignore];
         window.DarkReader.enable(THEME, { invert, ignoreImageAnalysis: ignore });
+        watchInlineImportantBackgrounds();
       } else {
-        window.DarkReader.disable();
+        stopWatchingInlineImportantBackgrounds();
+        try {
+          window.DarkReader.disable();
+        } finally {
+          restoreInlineBackgroundOverrides();
+        }
       }
       state.darkApplied = on;
       state.styleKey = key;

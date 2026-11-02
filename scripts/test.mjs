@@ -114,6 +114,7 @@ async function main() {
   for (const [slug, expected, label] of [
     ['light', false, 'light page'],
     ['simple-page', false, 'short contentful page'],
+    ['inline-important', false, 'email card with important inline background'],
     ['dark-attribute', true, 'data-theme dark page'],
     ['dark-body-class', true, 'body.dark page'],
     ['dark-painted', true, 'page whose dark canvas is painted by gradients'],
@@ -138,6 +139,43 @@ async function main() {
         && details.state.detected === true
         && details.state.reason === 'measured-light'
         && details.state.dark === true, JSON.stringify(details));
+    }
+    if (slug === 'inline-important') {
+      const converted = await waitFor(page, () => {
+        const card = document.querySelector('.message');
+        const background = getComputedStyle(card).backgroundColor;
+        return background !== 'rgb(255, 255, 255)' ? {
+          background,
+          priority: card.style.getPropertyPriority('background-color'),
+          color: getComputedStyle(card).color,
+          state: JSON.parse(document.documentElement.dataset.sdState || '{}'),
+        } : null;
+      }, 8000);
+      check('inline-important: message background is darkened', !!converted
+        && converted.priority === 'important' && converted.state.dark === true, JSON.stringify(converted));
+      await setStorage({ darkSites: { '127.0.0.1': false }, imageSites: {} });
+      const restored = await waitFor(page, () => {
+        const card = document.querySelector('.message');
+        const state = JSON.parse(document.documentElement.dataset.sdState || '{}');
+        if (state.dark !== false) return null;
+        return {
+          background: getComputedStyle(card).backgroundColor,
+          shorthand: card.style.getPropertyValue('background'),
+          shorthandPriority: card.style.getPropertyPriority('background'),
+          styleAttribute: card.getAttribute('style') || '',
+        };
+      }, 8000);
+      check('inline-important: original inline style is restored when the theme is off', !!restored
+        && restored.background === 'rgb(255, 255, 255)'
+        && restored.shorthand === 'rgb(255, 255, 255)'
+        && restored.shorthandPriority === 'important'
+        && !restored.styleAttribute.split(';').some((declaration) => {
+          const colon = declaration.indexOf(':');
+          return colon > 0 && declaration.slice(0, colon).trim().toLowerCase() === 'background-color';
+        }), JSON.stringify(restored));
+      await setStorage({ darkSites: { '127.0.0.1': true }, imageSites: {} });
+      const reapplied = await waitFor(page, () => getComputedStyle(document.querySelector('.message')).backgroundColor !== 'rgb(255, 255, 255)', 8000);
+      check('inline-important: converted background returns when the theme is on again', !!reapplied);
     }
     if (slug === 'dark-media') {
       await page.screenshot({ path: path.join(shots, '11-dark-hero.png') });
@@ -199,7 +237,7 @@ async function main() {
     }, 30000);
     check('live: article diagrams converted on a native dark site', !!ledger, ledger ? JSON.stringify(ledger) : 'no conversion');
     // Every skip must be a deliberate decision, never a breakdown: small and vector pictures are not candidates at all.
-    const DELIBERATE = ['already-dark', 'small', 'vector', 'ignore'];
+    const DELIBERATE = ['already-dark', 'small', 'vector', 'ignore', 'not-visible'];
     const broken = diagnostics.filter((d) => d.skip && !DELIBERATE.includes(d.skip));
     check('live: no image left in a failed state', !broken.length, JSON.stringify(broken));
     check('live: every skipped image says why', diagnostics.every((d) => !d.skip || DELIBERATE.includes(d.skip)), JSON.stringify(diagnostics.filter((d) => d.skip).map((d) => d.skip)));

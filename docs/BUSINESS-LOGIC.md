@@ -102,6 +102,14 @@ One dark hero banner or sidebar therefore cannot decide the verdict for the whol
 - **Theme settings** (`THEME`): brightness/contrast 100, no grayscale or sepia, system font stack, Dark Reader's
   background/text pairs, system controls themed.
 
+**Inline-important backgrounds.** Dark Reader can mark an element with `data-darkreader-inline-bgcolor` while its
+stylesheet conversion still loses to the page's inline `background` or `background-color` declaration with
+`!important`. For those marked elements only, the extension temporarily applies Dark Reader's resolved computed
+background as inline `background-color: … !important`, so the marked card itself is recoloured. Before doing so it
+saves the element's inline background-family declarations; when the theme is disabled, the marker disappears, or the
+element is detached, it restores those declarations and removes only the temporary background override. This is generic
+and does not target Gmail, message text, or specific selectors.
+
 ### 2.3 Fix lists and media safety
 
 - Fix lists come from `data/fixes.json`, a compiled slice of Dark Reader's config, matched against the hostname

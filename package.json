@@ -1,7 +1,7 @@
 {
   "name": "smart-dark",
   "displayName": "Smart Dark",
-  "version": "1.2.7",
+  "version": "1.2.8",
   "private": true,
   "description": "Dark theme for sites that lack one, plus smart dark conversion of large images",
   "type": "module",

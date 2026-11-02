@@ -26,6 +26,10 @@ Reference points: Dark Reader for page recolouring quality, DarkPage for image h
 
 Tone curves were prototyped in Python against real artwork before porting, which caught two defects: a linear-space/perc-heights confusion that crushed dark text, and a hue-scaling branch that turned white logos grey.
 
+## Repository notes
+
+The Dark Reader checkout (source of the fix lists) is not committed: `dist-templates/fixes.json` carries the compiled snapshot so a clean clone builds offline, and `npm run sync-fixes` refreshes it from upstream when needed.
+
 ## Known limits
 
 - Cross-origin images without CORS headers are skipped (browser restriction); they render as-is.

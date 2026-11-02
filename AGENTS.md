@@ -32,5 +32,10 @@
 ## Icons
 `npm run icons` re-renders `assets/icons/*.png` from `moon.svg` through Chromium. ImageMagick's SVG delegate produces empty tiles, so never regenerate icons with `convert` alone.
 
+## Updating the installed copy on the user's Mac
+An unpacked extension is read from disk only when Chrome loads it, so rebuilding `dist/` changes nothing until the extension reloads. On macOS the reload button on `chrome://extensions` cannot be triggered from the keyboard without driving the UI, so the practical route is a full restart: `osascript -e 'tell application "Google Chrome" to quit'`, wait for the process to exit, then `open -na "Google Chrome"` — the session comes back with `restore_on_startup` unset because Chrome records a clean shutdown.
+
+Chrome only opens a DevTools port when it is the one starting the process: launching with `--remote-debugging-port=9222` while a normal instance runs just forwards the URL to that instance, and adding `--user-data-dir` starts a separate profile instead. Both were tried. Without CDP, the bridge's `mac_see` / `mac_click` (with foreground consent) are the tools that can look at the window; a toolbar icon can be read from a screenshot crop, but not its version.
+
 ## Release
 `git tag v<version>` + GitHub release with the built zip attached; bump `package.json` and the manifest follows automatically at build time. The zip lands in the repository root (`smart-dark-<version>.zip`), not in `dist/`. `gh` is not installed in the sandbox: create the release with `POST /repos/.../releases` and attach the zip with `POST https://uploads.github.com/repos/.../releases/<id>/assets?name=<file>`. The Mac checkout drifts when artifacts are committed (modified screenshots block `git pull`); sync it with `git fetch && git reset --hard origin/main`, which is safe now that it holds nothing unique.

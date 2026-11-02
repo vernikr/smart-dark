@@ -16,7 +16,7 @@
     rowDark: document.getElementById('row-dark'),
     rowImages: document.getElementById('row-images'),
     note: document.getElementById('note'),
-    nativeHint: document.getElementById('native-hint'),
+    foot: document.getElementById('foot'),
     redetect: document.getElementById('redetect'),
   };
 
@@ -55,8 +55,10 @@
     else if (dark) ui.status.textContent = 'тёмная тема включена';
     else ui.status.textContent = 'сайт в светлом оформлении';
 
-    ui.nativeHint.hidden = !factoryDark;
-    ui.redetect.hidden = !(factoryDark && dark);
+    // The footer exists only to offer a re-check after a manual override on a themed site.
+    const showRedetect = !!(factoryDark && dark);
+    ui.redetect.hidden = !showRedetect;
+    ui.foot.hidden = !showRedetect;
     ui.rows.setAttribute('aria-busy', 'false');
   }
 
@@ -73,7 +75,6 @@
   ui.toggleDark.addEventListener('change', () => {
     snapshot.dark = ui.toggleDark.checked;
     ui.rowDark.classList.toggle('row--active', snapshot.dark);
-    ui.redetect.hidden = !(snapshot.factoryDark && snapshot.dark);
     paint();
     readSettings().then((s) => save({ darkSites: Object.assign({}, s.darkSites, { [domain]: snapshot.dark }) }));
   });
@@ -81,8 +82,7 @@
   ui.toggleImages.addEventListener('change', () => {
     snapshot.images = ui.toggleImages.checked;
     ui.rowImages.classList.toggle('row--active', snapshot.images);
-    ui.note.hidden = !snapshot.images;
-    ui.note.textContent = snapshot.images ? 'Вступит в силу после перезагрузки страницы' : '';
+    ui.note.hidden = true;
     readSettings().then((s) => save({ imageSites: Object.assign({}, s.imageSites, { [domain]: snapshot.images }) }));
   });
 
@@ -115,14 +115,13 @@
       factoryDark: false,
       detected: false,
       dark: typeof stored.darkSites[domain] === 'boolean' ? stored.darkSites[domain] : false,
-      images: stored.imageSites[domain] === true,
+      images: stored.imageSites[domain] !== false,
     };
     paint();
 
     const fresh = await send({ action: 'get' });
     if (fresh) {
       snapshot = Object.assign({}, fresh);
-      snapshot.images = fresh.images === true;
       frameId = fresh.frame || 0;
       paint();
     }

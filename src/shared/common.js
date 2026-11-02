@@ -29,9 +29,14 @@
     return typeof v === 'boolean' ? v : null;
   }
 
-  function isImageSite(settings, key) {
-    return settings.imageSites[key] === true;
+  function imagesEnabled(settings, key) {
+    return settings.imageSites[key] !== false;
   }
 
-  window.WD = { DEFAULTS, API, FRAME_ID, getSettings, setSettings, domainKey, isDarkSite, isImageSite };
+  function darkChoice(settings, key) {
+    const value = settings.darkSites[key];
+    return typeof value === 'boolean' ? value : null;
+  }
+
+  window.WD = { DEFAULTS, API, FRAME_ID, getSettings, setSettings, domainKey, isDarkSite, imagesEnabled, darkChoice };
 })();

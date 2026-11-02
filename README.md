@@ -3,7 +3,7 @@
 Chrome/Edge extension that darkens light websites and darkens large images without losing their colours.
 
 - **Site layer.** Detects whether a site already ships a dark theme. Light sites are darkened automatically; sites that are dark already are left alone. The switch `Затемнять сайт <domain>` overrides the detection and is remembered per site.
-- **Image layer.** Large images (article art, landing illustrations, diagrams, photos, transparent logos and icons) are re-toned so they sit on a dark page. Hue, saturation and transparency are preserved: light artwork is remapped into a dark band instead of being inverted or dimmed. The switch `Затемнять изображения на <domain>` is remembered per site.
+- **Image layer.** Large images (article art, landing illustrations, diagrams, photos, transparent logos and icons) are re-toned so they sit on a dark page. Hue, saturation and transparency are preserved: light artwork is remapped into a dark band instead of being inverted or dimmed. The layer is **on for every site by default**; the switch `Затемнять изображения на <domain>` turns it off for one site and is remembered.
 
 Both switches live in the toolbar popup. There are no other settings.
 
@@ -11,7 +11,7 @@ Both switches live in the toolbar popup. There are no other settings.
 
 1. Download the latest `smart-dark-*.zip` from [Releases](../../releases) and unpack it, or run `npm install && npm run build` and use the resulting `dist/`.
 2. Open `chrome://extensions`, enable Developer mode, press **Load unpacked**, pick the unpacked folder.
-3. Open a page: the site layer works immediately, the image layer starts after the site switch for images is turned on.
+3. Open a page: both layers work immediately, the popup only exists to override them per site.
 
 ## How it behaves
 
@@ -21,7 +21,8 @@ Both switches live in the toolbar popup. There are no other settings.
 | Site with its own dark theme | Untouched, images can still be converted |
 | Switch `Затемнять сайт` turned on by hand | Site is darkened even if it has a dark theme |
 | Switch `Затемнять сайт` turned off by hand | Site stays light on later visits |
-| Any site, image switch on | Large raster images are re-toned; SVG art, already-dark images and small UI icons are skipped |
+| Any site, image switch untouched | Large raster images are re-toned; SVG art, already-dark images and small UI icons are skipped |
+| Any site, image switch off | The site renders original artwork; already converted images are restored in place |
 
 ## Where the logic comes from
 

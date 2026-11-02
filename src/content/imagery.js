@@ -301,12 +301,41 @@
     }
   }
 
+  function restore() {
+    if (stopper) {
+      stopper();
+      stopper = null;
+    }
+    document.querySelectorAll('img[data-sd-source]').forEach((img) => {
+      const source = img.dataset.sdSource;
+      const srcset = img.dataset.sdSrcset;
+      delete img.dataset.sdDone;
+      delete img.dataset.sdInfo;
+      delete img.dataset.sdSkip;
+      delete img.dataset.sdQueued;
+      delete img.dataset.sdTracked;
+      delete img.dataset.sdLocked;
+      delete img.dataset.sdSource;
+      delete img.dataset.sdAttempts;
+      img.style.removeProperty('filter');
+      if (srcset) {
+        img.srcset = srcset;
+        delete img.dataset.sdSrcset;
+      }
+      if (source) img.src = source;
+    });
+  }
+
+  let stopper = null;
+
   function start(options) {
+    if (stopper) return Promise.resolve();
     const processor = new Processor(options.selectors);
+    let active = true;
     const seen = new WeakSet();
 
     const consider = (el) => {
-      if (seen.has(el)) return;
+      if (!active || seen.has(el)) return;
       seen.add(el);
       processor.enqueue(el);
     };
@@ -343,6 +372,7 @@
       processor.enqueue(img);
     };
     const sourceWatcher = new MutationObserver((list) => {
+      if (!active) return;
       list.forEach((mutation) => {
         const img = mutation.target;
         if (img.tagName === 'IMG') refresh(img);
@@ -350,6 +380,7 @@
     });
 
     const mutations = new MutationObserver((list) => {
+      if (!active) return;
       for (const mutation of list) {
         mutation.addedNodes && mutation.addedNodes.forEach((node) => {
           if (node.nodeType !== 1) return;
@@ -380,7 +411,16 @@
     track();
     mutations.observe(document.documentElement, { childList: true, subtree: true });
     if (document.readyState !== 'complete') window.addEventListener('load', track, { once: true });
+
+    stopper = () => {
+      active = false;
+      observer.disconnect();
+      mutations.disconnect();
+      sourceWatcher.disconnect();
+      processor.queue.length = 0;
+    };
+    return Promise.resolve();
   }
 
-  window.WDImagery = { start, classify, CURVES };
+  window.WDImagery = { start, stop: restore, restore, classify, CURVES };
 })();

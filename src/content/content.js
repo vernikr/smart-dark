@@ -44,12 +44,21 @@
     } catch (err) { /* unsupported document */ }
   }
 
+  function stopImages() {
+    if (!state.images) return;
+    state.images = false;
+    if (window.WDImagery && window.WDImagery.stop) window.WDImagery.stop();
+  }
+
   function startImages() {
     if (state.images) return;
     state.images = true;
     state.imageError = null;
     try {
-      window.WDImagery.start({ selectors: { invert: state.fixes.invert, ignore: state.fixes.ignore } });
+      const started = window.WDImagery.start({ selectors: { invert: state.fixes.invert, ignore: state.fixes.ignore } });
+      started.then(() => { if (state.images) return; }).catch((err) => {
+        state.imageError = String(err && err.message ? err.message : err);
+      });
     } catch (err) {
       state.imageError = String(err && err.message ? err.message : err);
     }
@@ -97,7 +106,8 @@
 
       const wantTheme = forced === true ? true : forced === false ? false : factoryDark !== true;
       applyTheme(wantTheme);
-      if (window.WD.isImageSite(settings, key)) startImages();
+      if (window.WD.imagesEnabled(settings, key)) startImages();
+      else stopImages();
       mirror();
       return snapshot();
     });

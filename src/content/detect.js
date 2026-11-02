@@ -1,15 +1,15 @@
-/* Factory dark theme detection: samples the background the user actually sees plus declared signals. */
+/* Factory dark theme detection: declared signals first, then colours measured with our own theme switched off. */
 (function () {
   'use strict';
 
-  const DARK_LUMINANCE = 0.18;
-  const LIGHT_LUMINANCE = 0.5;
-  const DARK_SHARE = 0.5;
-  const LIGHT_SHARE = 0.5;
-  const LIGHT_TEXT_LUMINANCE = 0.6;
-  const MAX_TEXT_SAMPLES = 40;
-  const MID_LUMINANCE = 0.35;
-  const DARK_THEME_HINTS = /(^|\s)(dark|dark-mode|darkmode|theme-dark|night)(\s|$)/i;
+  const DARK_LIGHTNESS = 0.6;
+  const LIGHT_TEXT_LIGHTNESS = 0.4;
+  const MIN_LIGHTNESS_FOR_TEXT_CHECK = 0.5;
+  const SAMPLING_STEP = 256;
+  const MAX_SAMPLES_PER_AXIS = 4;
+  const OWN_BACKGROUNDS = new Set(['24,26,27', '33,36,38', '220,218,215']);
+  const STRICTLY_DARK = /^(only\s+)?dark$/;
+  const STRICTLY_LIGHT = /^(only\s+)?light$/;
 
   function parseColor(value) {
     if (!value) return null;
@@ -17,102 +17,138 @@
     if (!match) return null;
     const parts = match[1].split(/[\s,\/]+/).filter(Boolean).map(Number);
     if (parts.length < 3 || parts.slice(0, 3).some((n) => Number.isNaN(n))) return null;
-    const alpha = parts.length > 3 ? parts[3] : 1;
-    return alpha > 0.05 ? parts.slice(0, 3) : null;
+    return { r: parts[0], g: parts[1], b: parts[2], a: parts.length > 3 ? parts[3] : 1 };
   }
 
-  function luminance(rgb) {
-    const [r, g, b] = rgb.map((channel) => {
+  function lightness(color) {
+    const [r, g, b] = [color.r, color.g, color.b].map((channel) => {
       const c = channel / 255;
       return c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
     });
     return 0.2126 * r + 0.7152 * g + 0.0722 * b;
   }
 
-  /** Luminance of the first painted ancestor background at a point. */
-  function backgroundAt(x, y) {
-    let el = document.elementFromPoint(x, y);
-    while (el) {
-      const style = getComputedStyle(el);
-      if (style.visibility !== 'hidden' && style.display !== 'none') {
-        const rgb = parseColor(style.backgroundColor);
-        if (rgb) return luminance(rgb);
-        if (style.backgroundImage && style.backgroundImage !== 'none') return null;
-      }
-      el = el.parentElement;
-    }
-    return null;
+  function ownStyleSheets() {
+    const fromNodes = Array.from(document.styleSheets).filter((sheet) => {
+      const owner = sheet.ownerNode;
+      return owner && owner.classList && owner.classList.contains('darkreader');
+    });
+    const adopted = Array.isArray(document.adoptedStyleSheets) ? Array.from(document.adoptedStyleSheets) : [];
+    const fromAdopted = adopted.filter((sheet) => {
+      const first = sheet.cssRules && sheet.cssRules[0];
+      return first && first.selectorText && first.selectorText.startsWith('#__darkreader');
+    });
+    return fromNodes.concat(fromAdopted);
   }
 
-  function sampleViewport() {
-    const width = Math.max(1, window.innerWidth);
-    const height = Math.max(1, window.innerHeight);
-    const values = [];
-    for (let row = 1; row <= 3; row++) {
-      for (let col = 1; col <= 4; col++) {
-        const value = backgroundAt((width * col) / 5, (height * row) / 4);
-        if (value !== null) values.push(value);
-      }
+  /** Measurements taken while our own theme is active would describe our repaint, not the site. */
+  function withOwnThemeOff(measure) {
+    const sheets = ownStyleSheets().filter((sheet) => !sheet.disabled);
+    sheets.forEach((sheet) => { sheet.disabled = true; });
+    try {
+      return measure();
+    } finally {
+      sheets.forEach((sheet) => { sheet.disabled = false; });
     }
-    if (!values.length) return null;
-    const dark = values.filter((v) => v <= DARK_LUMINANCE).length / values.length;
-    const light = values.filter((v) => v >= LIGHT_LUMINANCE).length / values.length;
-    return { darkShare: dark, lightShare: light, mean: values.reduce((a, b) => a + b, 0) / values.length };
-  }
-
-  function bodyLuminance() {
-    const body = document.body;
-    const root = document.documentElement;
-    const fromBody = parseColor(body && getComputedStyle(body).backgroundColor);
-    if (fromBody) return luminance(fromBody);
-    const fromRoot = parseColor(getComputedStyle(root).backgroundColor);
-    return fromRoot ? luminance(fromRoot) : null;
-  }
-
-  function textLuminance() {
-    const walker = document.createTreeWalker(document.body || document.documentElement, NodeFilter.SHOW_TEXT);
-    const values = [];
-    let node = walker.nextNode();
-    while (node && values.length < MAX_TEXT_SAMPLES) {
-      const text = node.textContent && node.textContent.trim();
-      if (text && text.length > 2 && node.parentElement && node.parentElement.getClientRects().length) {
-        const rgb = parseColor(getComputedStyle(node.parentElement).color);
-        if (rgb) values.push(luminance(rgb));
-      }
-      node = walker.nextNode();
-    }
-    return values.length ? values.reduce((a, b) => a + b, 0) / values.length : null;
   }
 
   function declaredDark() {
     const meta = document.querySelector('meta[name="color-scheme"]');
-    if (meta && /dark/.test(meta.content || '')) return true;
+    const content = meta && (meta.content || '').trim().toLowerCase();
+    if (content && STRICTLY_DARK.test(content)) return true;
+
     const root = document.documentElement;
-    if (getComputedStyle(root).colorScheme === 'dark') return true;
-    const hints = [root.getAttribute('data-theme'), root.getAttribute('data-color-mode'), root.className,
-      document.body && document.body.getAttribute('data-theme'), document.body && document.body.className];
-    if (hints.some((hint) => typeof hint === 'string' && DARK_THEME_HINTS.test(hint))) {
-      return (bodyLuminance() || 1) <= DARK_LUMINANCE;
+    const body = document.body;
+    if (root.classList.contains('dark') || (body && body.classList.contains('dark'))) return true;
+    const theme = (root.dataset.theme || (body && body.dataset.theme) || '').toLowerCase();
+    if (theme === 'dark') return true;
+    const mode = (root.dataset.colorMode || (body && body.dataset.colorMode) || '').toLowerCase();
+    if (mode === 'dark') return true;
+    return false;
+  }
+
+  function declaredLight() {
+    const meta = document.querySelector('meta[name="color-scheme"]');
+    const content = meta && (meta.content || '').trim().toLowerCase();
+    return !!content && STRICTLY_LIGHT.test(content);
+  }
+
+  function samplePoints() {
+    const width = innerWidth || document.documentElement.clientWidth;
+    const height = innerHeight || document.documentElement.clientHeight;
+    const stepX = Math.floor(width / Math.min(MAX_SAMPLES_PER_AXIS, Math.ceil(width / SAMPLING_STEP)) || width);
+    const stepY = Math.floor(height / Math.min(MAX_SAMPLES_PER_AXIS, Math.ceil(height / SAMPLING_STEP)) || height);
+    const points = [];
+    for (let y = Math.floor(stepY / 2); y < height; y += stepY) {
+      for (let x = Math.floor(stepX / 2); x < width; x += stepX) points.push([x, y]);
+    }
+    return points;
+  }
+
+  function isOwnColor(color) {
+    return OWN_BACKGROUNDS.has(`${color.r},${color.g},${color.b}`);
+  }
+
+  function measure() {
+    const root = document.documentElement;
+    const rootStyle = getComputedStyle(root);
+    if (rootStyle.colorScheme === 'dark') return true;
+
+    let sawOpaque = false;
+    const visited = new Set();
+    for (const [x, y] of samplePoints()) {
+      const element = document.elementFromPoint(x, y);
+      if (!element || element.tagName === 'IMG' || visited.has(element)) continue;
+      visited.add(element);
+      const style = element === root ? rootStyle : getComputedStyle(element);
+      const background = parseColor(style.backgroundColor);
+
+      if (background && background.a === 1) {
+        if (isOwnColor(background)) return false;
+        sawOpaque = true;
+        if (lightness(background) > DARK_LIGHTNESS) return false;
+        continue;
+      }
+      if (!background || background.a < 1) {
+        const text = parseColor(style.color);
+        if (!text) return false;
+        if (lightness(text) < LIGHT_TEXT_LIGHTNESS) return false;
+      }
+    }
+
+    const rootColor = parseColor(rootStyle.backgroundColor);
+    const bodyColor = document.body ? parseColor(getComputedStyle(document.body).backgroundColor) : null;
+    if (!bodyColor) return false;
+    if (rootColor && bodyColor && rootColor.a === 0 && bodyColor.a === 0) {
+      const text = parseColor(rootStyle.color);
+      return !!text && lightness(text) > MIN_LIGHTNESS_FOR_TEXT_CHECK;
+    }
+    if (rootColor && isOwnColor(rootColor)) return false;
+    if (isOwnColor(bodyColor)) return false;
+
+    const base = rootColor ? (1 - rootColor.a) + rootColor.a * lightness(rootColor) : 1;
+    return (1 - bodyColor.a) * base + bodyColor.a * lightness(bodyColor) < 0.5;
+  }
+
+  function ready() {
+    const body = document.body;
+    if (!body) return false;
+    if (body.childElementCount === 0 || body.clientHeight < 32) return false;
+    for (const child of body.children) {
+      const tag = child.tagName;
+      if (tag !== 'SCRIPT' && tag !== 'STYLE' && tag !== 'LINK') return true;
     }
     return false;
   }
 
   function detect() {
     if (!document.body) return { dark: false, reason: 'no-body', ready: false };
-    const bodyLum = bodyLuminance();
-    if (bodyLum !== null && bodyLum <= DARK_LUMINANCE) return { dark: true, reason: 'body-background', ready: true };
+    if (declaredLight()) return { dark: false, reason: 'declared-light', ready: true };
+    if (declaredDark()) return { dark: true, reason: 'declared-dark', ready: true };
+    if (!ready()) return { dark: false, reason: 'not-ready', ready: false };
 
-    if (bodyLum !== null && bodyLum >= LIGHT_LUMINANCE) return { dark: false, reason: 'body-background', ready: true };
-
-    const viewport = sampleViewport();
-    if (viewport && viewport.darkShare >= DARK_SHARE) return { dark: true, reason: 'viewport-background', ready: true };
-    if (viewport && viewport.lightShare >= LIGHT_SHARE) return { dark: false, reason: 'viewport-background', ready: true };
-    if (bodyLum !== null && bodyLum >= MID_LUMINANCE) return { dark: false, reason: 'body-background', ready: true };
-
-    const text = textLuminance();
-    if (text !== null && text >= LIGHT_TEXT_LUMINANCE) return { dark: true, reason: 'light-text', ready: true };
-    if (declaredDark()) return { dark: true, reason: 'declared-scheme', ready: true };
-    return { dark: false, reason: 'inconclusive', ready: viewport !== null };
+    const dark = withOwnThemeOff(measure);
+    return { dark, reason: dark ? 'measured-dark' : 'measured-light', ready: true };
   }
 
   window.WDDetect = { detect };

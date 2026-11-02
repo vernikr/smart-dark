@@ -30,6 +30,16 @@ Tone curves were prototyped in Python against real artwork before porting, which
 
 The Dark Reader checkout (source of the fix lists) is not committed: `dist-templates/fixes.json` carries the compiled snapshot so a clean clone builds offline, and `npm run sync-fixes` refreshes it from upstream when needed.
 
+## 1.1.0 follow-up
+
+| Report | Cause | Fix |
+| --- | --- | --- |
+| Toolbar icon invisible | ImageMagick rendered the SVG through a delegate that produced fully transparent tiles | Icons are rendered from `moon.svg` in Chromium (`npm run icons`), popup header uses the PNG asset |
+| Popup font | Explicit Web-font stack | Native system stack (`-apple-system`, `Segoe UI Variable Text`, `system-ui`) |
+| Images off by default | Switch treated an unset site as off | Unset now means on; an explicit `false` turns the layer off and restores originals in place |
+| Footer duplicated the status line | Static hint text in the footer | Footer renders only with the re-check action, otherwise hidden and not laid out |
+| arena.ai read as dark | Detection ran after our own repaint set `body` to the Dark Reader background | Declared signals first, then measurement with own stylesheets disabled and own colours rejected |
+
 ## Known limits
 
 - Cross-origin images without CORS headers are skipped (browser restriction); they render as-is.

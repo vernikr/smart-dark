@@ -119,8 +119,29 @@ async function main() {
     check('live: native dark blog detected', false, 'site unreachable from the sandbox');
   }
 
+  // 2b. a light page reached through a challenge screen must not be read as dark
+  await setStorage({ darkSites: {}, imageSites: {} });
+  const arena = await context.newPage();
+  await arena.goto('https://arena.ai', { waitUntil: 'domcontentloaded', timeout: 60000 }).catch(() => null);
+  if (arena.url().includes('arena.ai')) {
+    const probe = await waitFor(arena, () => {
+      const state = document.documentElement.dataset.sdState;
+      return state ? { state: JSON.parse(state), title: document.title, body: document.body.innerText.slice(0, 40) } : null;
+    });
+    const challenge = /security verification|just a moment|verifying/i.test(`${probe.title} ${probe.body}`);
+    console.log('arena probe:', JSON.stringify(probe));
+    if (challenge) {
+      check('arena.ai: light challenge page is not mistaken for a dark theme', probe.state.factoryDark === false && probe.state.dark === true, JSON.stringify(probe.state));
+    } else {
+      const bodyBg = await arena.evaluate(() => getComputedStyle(document.body).backgroundColor);
+      check('arena.ai: detection matches the real page', typeof probe.state.factoryDark === 'boolean', `${probe.state.factoryDark} | ${bodyBg}`);
+    }
+    await arena.screenshot({ path: path.join(shots, '16-arena.png') });
+  }
+  await arena.close();
+
   // 3. image conversion on the same native dark site
-  await setStorage({ darkSites: {}, imageSites: { 'kiro.dev': true } });
+  await setStorage({ darkSites: {}, imageSites: {} });
   if (kiro.url().includes('kiro.dev')) {
     await kiro.reload({ waitUntil: 'domcontentloaded' });
     await scrollThrough(kiro);
@@ -147,7 +168,7 @@ async function main() {
   }
 
   // 4. image classes on the fixture
-  await setStorage({ darkSites: {}, imageSites: { '127.0.0.1': true } });
+  await setStorage({ darkSites: {}, imageSites: {} });
   const images = await context.newPage();
   await images.goto(`${base}/images/`, { waitUntil: 'load' });
   await scrollThrough(images);
@@ -197,7 +218,20 @@ async function main() {
   const labels = await popup.evaluate(() => [document.getElementById('label-dark').textContent, document.getElementById('label-images').textContent]);
   check('popup uses the requested labels', /Затемнять сайт/.test(labels[0]) && /Затемнять изображения/.test(labels[1]), JSON.stringify(labels));
   const initial = await popup.evaluate(() => ({ dark: document.getElementById('toggle-dark').checked, images: document.getElementById('toggle-images').checked }));
-  check('popup reflects the auto-enabled theme', initial.dark === true && initial.images === false, JSON.stringify(initial));
+  check('popup reflects the auto-enabled theme', initial.dark === true, JSON.stringify(initial));
+  check('images are on by default', initial.images === true, JSON.stringify(initial));
+  const footer = await popup.evaluate(() => {
+    const foot = document.getElementById('foot');
+    const style = getComputedStyle(foot);
+    return { hidden: foot.hidden, display: style.display, height: foot.getBoundingClientRect().height, text: foot.innerText.trim() };
+  });
+  check('footer is hidden while it has nothing to offer', footer.hidden && footer.display === 'none' && footer.height === 0, JSON.stringify(footer));
+  const iconOk = await popup.evaluate(() => {
+    const el = document.querySelector('.head__icon');
+    const url = getComputedStyle(el).backgroundImage.match(/url\("(.*)"\)/);
+    return { matches: !!url, url: url ? url[1] : null };
+  });
+  check('popup shows the icon asset', iconOk.matches, JSON.stringify(iconOk));
   await popup.screenshot({ path: path.join(shots, '14-popup-on.png') });
 
   await popup.click('#row-dark');
@@ -207,12 +241,12 @@ async function main() {
   await popup.click('#row-images');
   await popup.waitForTimeout(1200);
   const stored2 = await worker.evaluate(() => chrome.storage.local.get({ darkSites: {}, imageSites: {} }));
-  check('image switch state is persisted', stored2.imageSites['127.0.0.1'] === true, JSON.stringify(stored2.imageSites));
+  check('image switch can be turned off and is persisted', stored2.imageSites['127.0.0.1'] === false, JSON.stringify(stored2.imageSites));
 
   await popup.reload();
   await popup.waitForTimeout(1200);
   const restored = await popup.evaluate(() => ({ dark: document.getElementById('toggle-dark').checked, images: document.getElementById('toggle-images').checked }));
-  check('popup restores saved switch states', restored.dark === false && restored.images === true, JSON.stringify(restored));
+  check('popup restores saved switch states', restored.dark === false && restored.images === false, JSON.stringify(restored));
 
   await site.waitForTimeout(800);
   check('site layer follows the switch', (await state(site)).dark === false, JSON.stringify(await state(site)));

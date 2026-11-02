@@ -2,7 +2,7 @@
   {
     "name": "detection: light page",
     "ok": true,
-    "detail": "{\"factoryDark\":false,\"detected\":true,\"dark\":true,\"reason\":\"body-background\",\"imageError\":null}"
+    "detail": "{\"factoryDark\":false,\"detected\":true,\"dark\":true,\"reason\":\"measured-light\",\"imageError\":null}"
   },
   {
     "name": "detection: light page gets the theme without manual action",
@@ -12,22 +12,27 @@
   {
     "name": "detection: data-theme dark page",
     "ok": true,
-    "detail": "{\"factoryDark\":true,\"detected\":true,\"dark\":false,\"reason\":\"body-background\",\"imageError\":null}"
+    "detail": "{\"factoryDark\":true,\"detected\":true,\"dark\":false,\"reason\":\"declared-dark\",\"imageError\":null}"
   },
   {
     "name": "detection: page with a dark hero only",
     "ok": true,
-    "detail": "{\"factoryDark\":false,\"detected\":true,\"dark\":true,\"reason\":\"body-background\",\"imageError\":null}"
+    "detail": "{\"factoryDark\":false,\"detected\":true,\"dark\":true,\"reason\":\"measured-light\",\"imageError\":null}"
   },
   {
     "name": "live: native dark blog detected",
     "ok": true,
-    "detail": "{\"factoryDark\":true,\"detected\":true,\"dark\":false,\"reason\":\"body-background\",\"imageError\":null}"
+    "detail": "{\"factoryDark\":true,\"detected\":true,\"dark\":false,\"reason\":\"declared-dark\",\"imageError\":null}"
   },
   {
     "name": "live: theme stays off on native dark blog",
     "ok": true,
     "detail": ""
+  },
+  {
+    "name": "arena.ai: light challenge page is not mistaken for a dark theme",
+    "ok": true,
+    "detail": "{\"factoryDark\":false,\"detected\":true,\"dark\":true,\"reason\":\"measured-light\",\"imageError\":null}"
   },
   {
     "name": "live: article diagrams converted on a native dark site",
@@ -77,7 +82,22 @@
   {
     "name": "popup reflects the auto-enabled theme",
     "ok": true,
-    "detail": "{\"dark\":true,\"images\":false}"
+    "detail": "{\"dark\":true,\"images\":true}"
+  },
+  {
+    "name": "images are on by default",
+    "ok": true,
+    "detail": "{\"dark\":true,\"images\":true}"
+  },
+  {
+    "name": "footer is hidden while it has nothing to offer",
+    "ok": true,
+    "detail": "{\"hidden\":true,\"display\":\"none\",\"height\":0,\"text\":\"Проверить снова\"}"
+  },
+  {
+    "name": "popup shows the icon asset",
+    "ok": true,
+    "detail": "{\"matches\":true,\"url\":\"chrome-extension://kpbbnndlgfkkabjcidgfkonbiekaeinm/icons/icon-32.png\"}"
   },
   {
     "name": "dark switch state is persisted",
@@ -85,18 +105,18 @@
     "detail": "{\"127.0.0.1\":false}"
   },
   {
-    "name": "image switch state is persisted",
+    "name": "image switch can be turned off and is persisted",
     "ok": true,
-    "detail": "{\"127.0.0.1\":true}"
+    "detail": "{\"127.0.0.1\":false}"
   },
   {
     "name": "popup restores saved switch states",
     "ok": true,
-    "detail": "{\"dark\":false,\"images\":true}"
+    "detail": "{\"dark\":false,\"images\":false}"
   },
   {
     "name": "site layer follows the switch",
     "ok": true,
-    "detail": "{\"factoryDark\":false,\"detected\":true,\"dark\":false,\"reason\":\"body-background\",\"imageError\":null}"
+    "detail": "{\"factoryDark\":false,\"detected\":true,\"dark\":false,\"reason\":\"measured-light\",\"imageError\":null}"
   }
 ]

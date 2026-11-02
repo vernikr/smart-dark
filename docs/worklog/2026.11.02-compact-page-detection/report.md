@@ -12,3 +12,8 @@ Readiness now uses visible semantic text and distinct visible lines as evidence,
 
 - `npm run build` — passed; generated manifest and archive are version 1.2.7.
 - `npm test` — 52/52 checks passed, including the 19-pixel compact-page regression and the late-theme shell tests.
+
+## Release and local update
+
+- Published [v1.2.7](https://github.com/vernikr/smart-dark/releases/tag/v1.2.7) with `smart-dark-1.2.7.zip` attached.
+- Rebuilt the Mac checkout at `/Users/vernikr/Downloads/projects/smart-dark`; `dist/manifest.json` reports 1.2.7. Cleanly restarted Chrome so the unpacked extension loads the rebuilt files.

@@ -33,4 +33,4 @@
 `npm run icons` re-renders `assets/icons/*.png` from `moon.svg` through Chromium. ImageMagick's SVG delegate produces empty tiles, so never regenerate icons with `convert` alone.
 
 ## Release
-`git tag v<version>` + GitHub release with the built zip attached; bump `package.json` and the manifest follows automatically at build time.
+`git tag v<version>` + GitHub release with the built zip attached; bump `package.json` and the manifest follows automatically at build time. The zip lands in the repository root (`smart-dark-<version>.zip`), not in `dist/`. `gh` is not installed in the sandbox: create the release with `POST /repos/.../releases` and attach the zip with `POST https://uploads.github.com/repos/.../releases/<id>/assets?name=<file>`. The Mac checkout drifts when artifacts are committed (modified screenshots block `git pull`); sync it with `git fetch && git reset --hard origin/main`, which is safe now that it holds nothing unique.

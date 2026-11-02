@@ -99,6 +99,9 @@
       dark: state.darkApplied,
       reason: state.reason,
       imageError: state.imageError || null,
+      video: !!document.querySelector('video'),
+      invertCount: invertSelectors().length,
+      styleKey: state.styleKey || null,
     });
   }
 

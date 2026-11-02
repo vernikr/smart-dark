@@ -54,16 +54,21 @@
   }
 
   function applyTheme(on) {
-    if (!window.DarkReader || state.darkApplied === on) return;
+    if (!window.DarkReader) return;
+    const fixes = fixesFor(state.factoryDark);
+    const invert = invertSelectors();
+    const key = `${state.factoryDark}|${invert.join('|')}`;
+    // A video can arrive after the first paint and change which fixes are safe, so the key decides, not just the flag.
+    if (state.darkApplied === on && state.styleKey === key) return;
     try {
       if (on) {
-        const fixes = fixesFor(state.factoryDark);
         const ignore = [...MEDIA_SAFE, ...fixes.ignore];
-        window.DarkReader.enable(THEME, { invert: invertSelectors(), ignoreImageAnalysis: ignore });
+        window.DarkReader.enable(THEME, { invert, ignoreImageAnalysis: ignore });
       } else {
         window.DarkReader.disable();
       }
       state.darkApplied = on;
+      state.styleKey = key;
     } catch (err) { /* unsupported document */ }
   }
 

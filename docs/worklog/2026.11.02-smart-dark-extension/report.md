@@ -24,7 +24,7 @@ The complete rule set — every threshold, decision table, skip reason and non-g
 
 ## Verification
 
-`npm test` runs 47 end-to-end checks in Chromium against local fixtures and the reference page `kiro.dev/blog/software-factory-stability/`: detection variants, live native-dark page, image classes with pixel statistics, switch persistence and popup wiring. Screenshots land in `shots/`.
+`npm test` runs 50 end-to-end checks in Chromium against local fixtures and the reference page `kiro.dev/blog/software-factory-stability/`: detection variants, live native-dark page, image classes with pixel statistics, switch persistence and popup wiring. Screenshots land in `shots/`.
 
 Tone curves were prototyped in Python against real artwork before porting, which caught two defects: a linear-space/perc-heights confusion that crushed dark text, and a hue-scaling branch that turned white logos grey.
 
@@ -120,6 +120,20 @@ Reported on `meduza.io/feature/2026/11/02/schitay-nas-prodali-no-my-privykli`: t
 Measured on the live frames of that article (extension off, frames read through `<source>`): photographs `photo/79…134`, mean 0.42→0.29 and light 0.33→0.04; the bright illustration `graphic/57`, 0.72→0.34 — it is still flipped, correctly. The dark banner `already-dark` is untouched, and the dark strip is `dim` (0.32→0.22, light 0.26→0.00).
 
 `npm test` is 44/44: new fixtures `images/lazy.html` (a 1×1 `data:` stand-in with the frame in `<source>`, a dark lettering poster, a flat dark strip, and a bright control photograph), `poster-dark.png` and `strip-dark.png`.
+
+## 1.2.6 follow-up
+
+Reported on `mail.google.com`: with the dark theme switched on in Gmail, the popup said "сайт в светлом оформлении", so the site layer was applying its own theme on top of an already dark page. The saved page the user attached carried the answer in its own diagnostics: `data-sd-state` held `reason: "not-ready"`, `detected: true`, `factoryDark: false`.
+
+| Report | Cause | Fix |
+| --- | --- | --- |
+| Gmail is judged light although it is dark | Gmail is an application shell: it lays out empty boxes first and paints the mail surface later. `detect()` returned `not-ready` for that state, `content.js` stored it as a verdict (`detected: true`) and never revisited it — and with the verdict already set, every later pass found `state.detected === true`, so the "re-render" points were no-ops. The verdict from the first 300 ms outlived the session | `not-ready` and a new `skeleton` verdict (≤ 16 elements in the body and a light canvas) no longer claim anything: previous knowledge stands and the next render asks again |
+| A measured verdict could never be corrected | Only `declared-*` could overwrite a verdict. Gmail's dark theme is applied by CSS with nothing declared on `<html>` or `<body>`, so there was no declaration to wait for | A measured verdict may be revised while the page is still changing (12 s of quiet since the last DOM/class/style mutation). A declared verdict is final |
+| The theme was invisible to the sample pool | The text pool (`h1, h2, p, li, span, a, button`) is empty in a mail list built from `div` rows; on a dark inbox the first pass could measure 15 votes, all of them the light canvas | When fewer than 6 votes are collected, painted containers are sampled too; the vote count is reported as `samples` |
+
+Verified with two new fixtures that reproduce the shape of the bug: `fixtures/late-dark/` (the theme arrives as a class, so it is declared late) and `fixtures/late-dark-measured/` (the theme arrives as inline styles with nothing declared). Before the fix the first one kept `measured-light` for the session; now both settle on `factoryDark: true` with the theme layer off. `npm test` is 50/50.
+
+The attached archive could not reproduce the live verdict on its own: the external stylesheet that paints Gmail's dark theme is not saved with "Web page, complete", and the page keeps 14 dark containers with a white `body`. What the archive does prove is the state the extension held at capture time, which is exactly the verdict described above.
 
 ## Documentation pass (1.2.4)
 

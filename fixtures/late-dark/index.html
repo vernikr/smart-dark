@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Theme that arrives after the first paint</title>
+  <style>
+    body { margin: 0; font: 16px/1.6 system-ui, sans-serif; background: #fff; color: #202124; }
+    main { padding: 48px 24px; }
+    .row { padding: 12px 0; border-bottom: 1px solid #e0e0e0; }
+    /* The dark theme is applied by a script a moment later, exactly as a web app applies a saved setting. */
+    body.dark { background: #131314; color: #e3e3e3; }
+    body.dark .row { border-color: #2c2c2e; }
+  </style>
+</head>
+<body>
+  <!-- A skeleton: the app shell is present and laid out long before the real surface is painted. -->
+  <main>
+    <div class="row">Skeleton row</div>
+    <div class="row">Skeleton row</div>
+    <div class="row">Skeleton row</div>
+    <div class="row">Skeleton row</div>
+    <div class="row">Skeleton row</div>
+  </main>
+  <script>
+    // 900 ms: the page is measurable (so "not ready" is not the excuse) and light until the theme lands.
+    setTimeout(() => {
+      document.body.classList.add('dark');
+      document.body.innerHTML = '<main>' + Array.from({ length: 12 }, (_, i) => `<div class="row">Mail row ${i + 1}</div>`).join('') + '</main>';
+    }, 900);
+  </script>
+</body>
+</html>

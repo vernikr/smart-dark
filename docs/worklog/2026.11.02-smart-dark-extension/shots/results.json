@@ -80,6 +80,21 @@
     "detail": "{\"video\":\"none\",\"player\":\"none\",\"chain\":0}"
   },
   {
+    "name": "late theme: a shell that is light before its theme arrives is not judged light",
+    "ok": true,
+    "detail": "{\"early\":{\"factoryDark\":false,\"detected\":true,\"dark\":true,\"reason\":\"measured-light\",\"imageError\":null,\"video\":false,\"invertCount\":0,\"styleKey\":\"false|\"},\"settled\":{\"factoryDark\":true,\"detected\":true,\"dark\":false,\"reason\":\"declared-dark\",\"imageError\":null,\"video\":false,\"invertCount\":0,\"styleKey\":\"true|\"}}"
+  },
+  {
+    "name": "late theme: the theme layer is off once the site is known to be dark",
+    "ok": true,
+    "detail": "{\"factoryDark\":true,\"detected\":true,\"dark\":false,\"reason\":\"declared-dark\",\"imageError\":null,\"video\":false,\"invertCount\":0,\"styleKey\":\"true|\"}"
+  },
+  {
+    "name": "late theme: an undeclared theme is found by a second measurement",
+    "ok": true,
+    "detail": "{\"factoryDark\":true,\"detected\":true,\"dark\":false,\"reason\":\"measured-dark\",\"imageError\":null,\"video\":false,\"invertCount\":0,\"styleKey\":\"true|\"}"
+  },
+  {
     "name": "images: photo, diagrams and logo classified separately",
     "ok": true,
     "detail": "[\"photo\",\"graphic\",\"graphic\",\"graphic\",\"icon\"]"

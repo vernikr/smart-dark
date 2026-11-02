@@ -119,18 +119,47 @@
     };
   }
 
-  /* Sites announce their theme late (YouTube sets <html dark> after its first paint), so declared signals always
-     win over the measured ones, and a measured verdict is only trusted until the page says something itself. */
+  /* Sites announce their theme late (YouTube sets <html dark> after its first paint), so declared signals always win
+     over the measured ones. An unfinished page is not evidence at all: `not-ready` and `skeleton` never decide
+     anything, they only say "ask again". A measured verdict can be revised until the page stops changing — Gmail is an
+     application shell that lays out before its dark surface exists, and a first-paint verdict stuck for the whole
+     session. Once the page survives REVISION_QUIET_MS without DOM changes, the measured verdict is final. */
+  const REVISION_QUIET_MS = 12000;
+  let lastChangeAt = Date.now();
+  let revisionObserver = null;
+
+  function watchForRevision() {
+    if (revisionObserver || typeof MutationObserver !== 'function') return;
+    revisionObserver = new MutationObserver(() => { lastChangeAt = Date.now(); });
+    revisionObserver.observe(document.documentElement, { childList: true, subtree: true, attributes: true, attributeFilter: ['class', 'style', 'data-theme', 'data-mode', 'color-scheme'] });
+  }
+
   function detect() {
     const result = window.WDDetect.detect();
     if (result.reason === 'no-body') return result.dark;
     const declared = result.reason.indexOf('declared-') === 0;
-    if (!state.detected || declared) {
+    if (result.reason === 'not-ready' || result.reason === 'skeleton') {
+      // Nothing to learn from this pass. Whatever we knew before stands, and nothing is claimed.
+      if (!state.detected) state.reason = result.reason;
+      return result.dark;
+    }
+    if (declared) {
+      state.factoryDark = result.dark;
+      state.reason = result.reason;
+      state.detected = true;
+      return result.dark;
+    }
+    // A declared verdict is the site speaking for itself; only a measurement may be revised, and only while the page
+    // is still being built.
+    const declaredBefore = state.reason && state.reason.indexOf('declared-') === 0;
+    const quietFor = Date.now() - lastChangeAt;
+    const revisable = !state.detected || (!declaredBefore && quietFor < REVISION_QUIET_MS);
+    if (revisable) {
       state.factoryDark = result.dark;
       state.reason = result.reason;
       state.detected = true;
     }
-    return result.dark;
+    return state.factoryDark;
   }
 
   function render() {
@@ -212,6 +241,7 @@
 
   function boot() {
     loadFixes().then(() => {
+      watchForRevision();
       render();
       const settle = () => render().then(() => {
         setTimeout(() => render(), 400);

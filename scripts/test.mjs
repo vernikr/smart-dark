@@ -231,6 +231,37 @@ async function main() {
   }
   await yt.close();
 
+  // 3b. a theme that arrives after the first paint: an app shell must not freeze a "light" verdict
+  await setStorage({ darkSites: {}, imageSites: {} });
+  const late = await context.newPage();
+  await late.goto(`${base}/late-dark/`, { waitUntil: 'domcontentloaded' });
+  const early = await waitFor(late, () => {
+    const raw = document.documentElement.dataset.sdState;
+    return raw ? JSON.parse(raw) : null;
+  }, 10000);
+  const settled = await waitFor(late, () => {
+    const raw = document.documentElement.dataset.sdState;
+    if (!raw) return null;
+    const state = JSON.parse(raw);
+    // The dark theme lands at ~900 ms; the verdict must be revised without a reload.
+    return state.factoryDark === true && state.reason !== 'not-ready' && state.reason !== 'skeleton' ? state : null;
+  }, 15000);
+  check('late theme: a shell that is light before its theme arrives is not judged light', !!settled, JSON.stringify({ early, settled }));
+  check('late theme: the theme layer is off once the site is known to be dark', !!settled && settled.dark === false, JSON.stringify(settled));
+  await late.close();
+
+  // The same, with nothing declared at all: only a second measurement can find the theme.
+  const lateMeasured = await context.newPage();
+  await lateMeasured.goto(`${base}/late-dark-measured/`, { waitUntil: 'domcontentloaded' });
+  const measuredSettled = await waitFor(lateMeasured, () => {
+    const raw = document.documentElement.dataset.sdState;
+    if (!raw) return null;
+    const state = JSON.parse(raw);
+    return state.factoryDark === true && state.reason === 'measured-dark' ? state : null;
+  }, 15000);
+  check('late theme: an undeclared theme is found by a second measurement', !!measuredSettled && measuredSettled.dark === false, JSON.stringify(measuredSettled));
+  await lateMeasured.close();
+
   // 4. image classes on the fixture
   await setStorage({ darkSites: {}, imageSites: {} });
   const images = await context.newPage();

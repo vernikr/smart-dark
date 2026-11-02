@@ -8,6 +8,11 @@
   const SAMPLING_STEP = 256;
   const MAX_SAMPLES_PER_AXIS = 4;
   const MAX_ELEMENT_SAMPLES = 48;
+  // A page that is lighter than this before any content exists is a skeleton, not a finished layout.
+  const SKELETON_MAX_ELEMENTS = 16;
+  // Below this many samples the page has hardly anything painted yet, so the measurement is not evidence.
+  const MIN_SAMPLES_FOR_VERDICT = 6;
+  const SKELETON_LIGHTNESS = 0.8;
   const OWN_BACKGROUNDS = new Set(['24,26,27', '33,36,38', '220,218,215']);
   const STRICTLY_DARK = /^(only\s+)?dark$/;
   const STRICTLY_LIGHT = /^(only\s+)?light$/;
@@ -206,6 +211,22 @@
       votes.push(lightness(text) < LIGHT_TEXT_LIGHTNESS ? 'light' : 'dark');
     }
 
+    // A web app paints its rows as divs with no text of their own; without this the pool is empty and a dark inbox
+    // measures as if nothing were painted.
+    if (votes.length < MIN_SAMPLES_FOR_VERDICT) {
+      const containers = Array.from(document.querySelectorAll('div,td,section,article,aside,nav'))
+        .filter((el) => el.getClientRects().length)
+        .slice(0, MAX_ELEMENT_SAMPLES);
+      for (const element of containers) {
+        const style = getComputedStyle(element);
+        const paint = paintsBackground(style);
+        if (!paint) continue;
+        if (paint.color) { votes.push(lightness(paint.color) > DARK_LIGHTNESS ? 'light' : 'dark'); continue; }
+        const color = paintedBackdrop(element);
+        if (color) votes.push(lightness(color) > DARK_LIGHTNESS ? 'light' : 'dark');
+      }
+    }
+
     const dark = votes.filter((vote) => vote === 'dark').length;
     return { dark, light: votes.length - dark, total: votes.length };
   }
@@ -239,6 +260,28 @@
     return (1 - bodyColor.a) * base + bodyColor.a * lightness(bodyColor) >= 0.5;
   }
 
+  /* An application shell lays out a few empty boxes before the real surface exists: a light body with no content yet is
+     not evidence that the site is light, and such a verdict used to stick for the whole session (Gmail). */
+  function looksLikeSkeleton() {
+    const body = document.body;
+    if (!body) return false;
+    const elements = body.querySelectorAll('*');
+    if (elements.length > SKELETON_MAX_ELEMENTS) return false;
+    const canvas = canvasVote();
+    if (canvas !== 'light') return false;
+    const color = parseColor(getComputedStyle(body).backgroundColor);
+    return !color || lightness(color) > SKELETON_LIGHTNESS;
+  }
+
+  /* The operating system preference is a hint, never a veto: it only decides a page that has nothing to measure. */
+  function systemPrefersDark() {
+    try {
+      return typeof matchMedia === 'function' && matchMedia('(prefers-color-scheme: dark)').matches;
+    } catch (err) {
+      return false;
+    }
+  }
+
   function measure() {
     if (getComputedStyle(document.documentElement).colorScheme === 'dark') return true;
     const result = survey();
@@ -264,13 +307,18 @@
 
   function detect() {
     if (!document.body) return { dark: false, reason: 'no-body', ready: false };
+    if (looksLikeSkeleton()) {
+      return { dark: systemPrefersDark(), reason: 'skeleton', ready: false };
+    }
     const declared = declaredScheme();
     if (declared === 'light') return { dark: false, reason: 'declared-light', ready: true };
     if (declared === 'dark') return { dark: true, reason: 'declared-dark', ready: true };
     if (!ready()) return { dark: false, reason: 'not-ready', ready: false };
 
     const dark = withOwnThemeOff(measure);
-    return { dark, reason: dark ? 'measured-dark' : 'measured-light', ready: true };
+    // A verdict taken from a near-empty page is weak evidence: `samples` lets the caller ask for a second look.
+    const samples = withOwnThemeOff(() => survey().total);
+    return { dark, reason: dark ? 'measured-dark' : 'measured-light', ready: true, samples };
   }
 
   window.WDDetect = { detect };

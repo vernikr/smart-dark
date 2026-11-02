@@ -18,6 +18,8 @@
 - The whole rule set (detection thresholds, decision tables, skip reasons, non-goals) is specified in `docs/BUSINESS-LOGIC.md`. Change a rule → change that file in the same commit; a rule that is in the code and not in the document is an unfinished change.
 
 ## Detection pitfalls
+- An unfinished page is not evidence. `not-ready` and `skeleton` (a shell: ≤ 16 elements in the body over a light canvas) never set a verdict, and a *measured* verdict can be revised for as long as the page keeps mutating (12 s of quiet). Gmail lays out a light shell before painting its dark surface; a first-paint verdict used to freeze and the site layer then themed an already dark page.
+- `prefers-color-scheme` is a hint for pages with nothing to measure, never a veto over a page that can be measured.
 - Sites announce their theme late: YouTube adds `<html dark>` only after its first paint. `detect()` in `src/content/content.js` therefore always re-runs before a render decision and lets a declared verdict (`declared-dark` / `declared-light`) override an earlier measured one; measurement is only the fallback until the site speaks.
 - A single dark block (hero banner, sidebar) must not decide the verdict: `measure()` surveys the whole viewport plus a pool of text elements and weighs the verdict against the page canvas (`canvasVote()`). A light canvas needs a 75% dark page to flip, a dark canvas 34%.
 - Colours are read from what an element actually paints: `backgroundColor` first, then `background-image` gradients, then the nearest painting ancestor, then text colour. A transparent `body` above a dark canvas is no longer read as a light site.

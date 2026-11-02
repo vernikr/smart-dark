@@ -38,14 +38,19 @@ first.
 | 1 | `<meta name="color-scheme">` is exactly `dark` / `light` (`only dark` allowed) | `declared-dark` / `declared-light` |
 | 2 | `<html>` or `<body>` attribute from the dark list (`dark`, `dark-mode`, `data-theme="dark"`, `data-scheme`, `night`, `color-scheme`, …) holds `''`, `true`, `1` or a dark scheme word | `declared-dark` |
 | 3 | `<html>`/`<body>` class matches the dark word list (`dark`, `darkmode`, `dark-theme`, `night`, `theme-dark`, …) or the light list (`light`, `light-theme`, …) | `declared-dark` / `declared-light` |
-| 4 | No body yet | `no-body`, dark = false (retried later) |
-| 5 | Body is effectively empty (no element children, or height < 32 px) | `not-ready`, retried later |
-| 6 | Measurement over the page | `measured-dark` / `measured-light` |
+| 4 | No body yet | `no-body` — nothing claimed, retried later |
+| 5 | Body is effectively empty (no element children, or height < 32 px) | `not-ready` — nothing claimed, retried later |
+| 6 | A shell: no more than 16 elements in the body **and** a light canvas | `skeleton` — nothing claimed, retried later; the system preference is reported in the meantime |
+| 7 | Measurement over the page | `measured-dark` / `measured-light` |
 
 **Measurement.** The page is sampled at up to 4×4 points of the viewport plus up to 48 text elements (`h1, h2, p, li,
 span, a, button`). For each sample the module takes, in order: the element's own opaque background colour, then the
 average colour of a `background-image` gradient/`url()`, then the nearest painting ancestor (max 8 levels), then the
 text colour. Lightness is relative luminance; above `0.6` is light, below `0.4` a text colour means a light site.
+
+**Sample pool.** 4×4 viewport points and up to 48 text elements; when the page paints fewer than 6 votes that way (a
+mail list is rows of `div`s, not paragraphs), painted containers (`div, td, section, article, aside, nav`) are sampled
+too. `detect()` reports the number of votes as `samples` so a near-empty measurement can be recognised.
 
 **Canvas vote.** The page canvas (`body`, else `html`) is the strongest single hint:
 
@@ -67,10 +72,16 @@ One dark hero banner or sidebar therefore cannot decide the verdict for the whol
 
 ### 2.2 Orchestration (`content.js`)
 
-- **Declared beats measured, and a verdict can be revised.** Until the page says something about itself, a measured
-  verdict is used; any later `declared-*` verdict replaces it. Reason: sites announce their theme late (YouTube sets
-  `<html dark>` after the first paint), and acting on the measured verdict first and never revisiting it left content
-  inverted.
+- **Declared beats measured, and a verdict can be revised.** Any `declared-*` verdict replaces a measured one at any
+  time. A measured verdict may also replace an earlier measured one, for as long as the page has not been quiet for
+  12 s (`REVISION_QUIET_MS`, driven by a MutationObserver on children, classes, styles and theme attributes). After
+  that the measured verdict is final.
+- **An unfinished page is never evidence.** `not-ready` and `skeleton` do not claim a verdict: the previous knowledge
+  stands and the next render asks again. Reason: Gmail is an application shell that lays out before its dark surface
+  exists, and a verdict taken at `not-ready` used to stick for the whole session — the popup said "сайт в светлом
+  оформлении" on an account with the dark theme on.
+- **The system preference is a hint, not a veto.** `prefers-color-scheme: dark` decides only the case where nothing can
+  be measured (`skeleton`), never a page that can be measured.
 - **Decision table** (`render()`):
 
 | Saved value | Factory dark | Site layer |
@@ -261,8 +272,9 @@ A light picture without a reason is a bug, not a policy: every skip must name it
   that size can still be dimmed where a flip was wanted.
 - A `<picture>` that swaps to a *different* picture through `<source>` alone is treated as a re-render and keeps the
   dark frame.
-- A site whose dark theme is painted but never announced can be measured as light; the announcement watch covers
-  attributes and added nodes only.
+- A site whose dark theme arrives later than 12 s after its last DOM change is measured as light and stays that way.
+- A theme applied only through a stylesheet whose rules cannot be read from the content script (an opaque `<link>` the
+  browser refuses to expose) cannot be classified as declared; measurement is the only route there.
 
 ## 7. How the rules are verified
 

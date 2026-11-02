@@ -1,4 +1,4 @@
-# b01 — Update the checkout on the user's Mac to v1.2.0
+# b01 — Update the checkout on the user's Mac to v1.2.0 (resolved)
 
 ## What is needed
 
@@ -22,3 +22,7 @@ Earlier rounds reached the Mac through a bridge that is not present now (no loca
 ## Resolved when
 
 `git -C … rev-parse HEAD` reports `6465fcb` or newer and `dist/manifest.json` reports `1.2.0`.
+
+## Resolution
+
+Reached the machine through the Arena Bridge on the second attempt. `git pull --ff-only` moved the clone from `4bf6dff` to `d6afa64`, `npm run build` produced `dist/` (1.1 MB) with manifest `1.2.0` and `smart-dark-1.2.0.zip` (206 555 B), and `npm test` reported 32/32 checks passed after installing the Playwright Chromium build the fresh `node_modules` needed.

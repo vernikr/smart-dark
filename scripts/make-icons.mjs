@@ -1,52 +1,71 @@
 #!/usr/bin/env node
-/** Renders the Lucide moon to PNG tiles through Chromium, so the icons match the source SVG exactly. */
+/** Rasterises the Lucide moon into PNG tiles inside Chromium, cropping to the pixels the stroke actually paints. */
 import { chromium } from 'playwright';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const svgPath = path.join(root, 'assets/icons/moon.svg');
-const base = fs.readFileSync(svgPath, 'utf8')
-  .replace('width="24" height="24"', 'width="512" height="512"');
-const html = `<!DOCTYPE html><html><body style="margin:0;background:transparent">${base}</body></html>`;
+const svg = fs.readFileSync(path.join(root, 'assets/icons/moon.svg'), 'utf8');
+const SIZES = [16, 32, 48, 128];
+const SOURCE = 1024;
+const PAD = 0.02;
+const ALPHA = 8;
 
 const browser = await chromium.launch({ channel: 'chromium', headless: true });
-const page = await browser.newPage({ viewport: { width: 512, height: 512 } });
-await page.setContent(html);
-const shot = await page.locator('svg').screenshot({ omitBackground: true });
-// Trim the stroke padding around the glyph so the moon fills the tile.
-const ink = await page.evaluate(() => {
-  const svg = document.querySelector('svg');
-  const box = svg.getBoundingClientRect();
-  const path = svg.querySelector('path');
-  const b = path.getBBox();
-  const scale = box.width / svg.viewBox.baseVal.width;
-  return { left: b.x * scale, top: b.y * scale, width: b.width * scale, height: b.height * scale, box: box.width };
-});
+const page = await browser.newPage();
+
+const tiles = await page.evaluate(async ({ svg, SIZES, SOURCE, PAD, ALPHA }) => {
+  const load = (markup, width, height) => new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = () => reject(new Error('svg-load-failed'));
+    img.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(markup.replace('width="24" height="24"', `width="${width}" height="${height}"`))}`;
+  });
+  const source = document.createElement('canvas');
+  source.width = source.height = SOURCE;
+  const sourceCtx = source.getContext('2d');
+  sourceCtx.drawImage(await load(svg, SOURCE, SOURCE), 0, 0);
+
+  // The stroke is centred on the path, so its bounds are taken from the painted pixels, not from the geometry.
+  const pixels = sourceCtx.getImageData(0, 0, SOURCE, SOURCE).data;
+  let left = SOURCE, top = SOURCE, right = 0, bottom = 0;
+  for (let y = 0; y < SOURCE; y++) {
+    for (let x = 0; x < SOURCE; x++) {
+      if (pixels[(y * SOURCE + x) * 4 + 3] <= ALPHA) continue;
+      if (x < left) left = x;
+      if (x > right) right = x;
+      if (y < top) top = y;
+      if (y > bottom) bottom = y;
+    }
+  }
+  const inkWidth = right - left + 1;
+  const inkHeight = bottom - top + 1;
+  const side = Math.max(inkWidth, inkHeight);
+  const pad = side * PAD;
+  const box = {
+    x: left - pad - (side - inkWidth) / 2,
+    y: top - pad - (side - inkHeight) / 2,
+    side: side + pad * 2,
+  };
+
+  const out = [];
+  for (const size of SIZES) {
+    const tile = document.createElement('canvas');
+    tile.width = tile.height = size;
+    const ctx = tile.getContext('2d');
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(source, box.x, box.y, box.side, box.side, 0, 0, size, size);
+    out.push({ size, data: tile.toDataURL('image/png').split(',')[1] });
+  }
+  return { ink: { left, top, inkWidth, inkHeight, box }, out };
+}, { svg, SIZES, SOURCE, PAD, ALPHA });
+
 await browser.close();
 
-const margin = Math.max(ink.width, ink.height) * 0.02;
-const side = Math.max(ink.width, ink.height) + margin * 2;
-const clip = {
-  x: Math.round(ink.left - margin + (ink.width - side) / 2 - 0.5),
-  y: Math.round(ink.top - margin + (ink.height - side) / 2 - 0.5),
-  width: Math.round(side + 1),
-  height: Math.round(side + 1),
-};
-console.log('glyph box', JSON.stringify(clip));
-
-const { default: sharp } = await import('node:zlib').then(() => ({ default: null })).catch(() => ({ default: null }));
-for (const size of [16, 32, 48, 128]) {
-  if (sharp) {
-    await sharp(shot).resize(size, size).png().toFile(path.join(root, `assets/icons/icon-${size}.png`));
-  } else {
-    fs.writeFileSync(path.join(root, 'tmp-icon-512.png'), shot);
-    const { execFileSync } = await import('node:child_process');
-    execFileSync('convert', ['-background', 'none', path.join(root, 'tmp-icon-512.png'),
-      '-crop', `${clip.width}x${clip.height}+${clip.x}+${clip.y}`, '+repage',
-      '-resize', `${size}x${size}`, path.join(root, `assets/icons/icon-${size}.png`)]);
-    fs.rmSync(path.join(root, 'tmp-icon-512.png'), { force: true });
-  }
-  console.log(`icon-${size}.png written`);
+for (const tile of tiles.out) {
+  fs.writeFileSync(path.join(root, `assets/icons/icon-${tile.size}.png`), Buffer.from(tile.data, 'base64'));
 }
+console.log('ink', JSON.stringify(tiles.ink));
+console.log(`icons written: ${SIZES.join(', ')}`);

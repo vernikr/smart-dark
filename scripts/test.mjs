@@ -11,7 +11,7 @@ import { fileURLToPath } from 'node:url';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const ext = path.join(root, 'dist');
 const fixtures = path.join(root, 'fixtures');
-const shots = path.join(root, 'docs/worklog/2026.11.07-dom-image-lifecycle/shots');
+const shots = path.join(root, 'docs/worklog/2026.11.07-site-compatibility/shots');
 fs.mkdirSync(shots, { recursive: true });
 
 const results = [];
@@ -26,9 +26,10 @@ const skip = (name, detail = '') => {
 };
 
 
-const TYPES = { '.html': 'text/html', '.png': 'image/png', '.jpg': 'image/jpeg', '.svg': 'image/svg+xml' };
+const TYPES = { '.html': 'text/html', '.css': 'text/css', '.png': 'image/png', '.jpg': 'image/jpeg', '.svg': 'image/svg+xml' };
 
 let corsPort = 0;
+let lastCdnRequest = null;
 
 function serve() {
   const server = http.createServer((req, res) => {
@@ -43,7 +44,16 @@ function serve() {
       if (res.destroyed) return;
       let body = fs.readFileSync(file);
       if (file.endsWith('.html') && body.includes('__CORS__')) body = body.toString('utf8').replace('__CORS__', String(corsPort));
-      res.writeHead(200, { 'content-type': TYPES[path.extname(file)] || 'application/octet-stream' }).end(body);
+      const headers = { 'content-type': TYPES[path.extname(file)] || 'application/octet-stream' };
+      if (requestUrl.pathname === '/strict-csp/' || requestUrl.pathname === '/strict-csp/index.html') {
+        headers['content-security-policy'] = [
+          "default-src 'self'",
+          "img-src 'self' data: blob:",
+          "style-src 'self' 'unsafe-inline'",
+          "script-src 'self'",
+        ].join('; ');
+      }
+      res.writeHead(200, headers).end(body);
     };
     const delay = Math.min(3000, Math.max(0, Number(requestUrl.searchParams.get('delay') || 0)));
     if (delay) setTimeout(send, delay);
@@ -56,15 +66,32 @@ function serve() {
    carries cookies is rejected by the browser against such a header, so this server is what catches that mistake. */
 function serveCdn() {
   const server = http.createServer((req, res) => {
-    const file = path.join(fixtures, 'images', path.basename(decodeURIComponent(req.url.split('?')[0])));
-    if (!file.startsWith(fixtures) || !fs.existsSync(file)) {
+    const name = path.basename(decodeURIComponent(req.url.split('?')[0]));
+    lastCdnRequest = { url: req.url, cookie: req.headers.cookie || null };
+    if (name === 'large.bin') {
+      res.writeHead(200, {
+        'content-type': 'application/octet-stream',
+        'access-control-allow-origin': '*',
+      });
+      const block = Buffer.alloc(8 * 1024 * 1024);
+      res.write(block);
+      res.write(block);
+      res.end(Buffer.from([0]));
+      return;
+    }
+    const file = path.join(fixtures, 'images', name);
+    if (!file) {
       res.writeHead(404).end('not found');
       return;
+    }
+    let body = fs.readFileSync(file);
+    if (file.endsWith('.css') && body.includes('__CORS__')) {
+      body = Buffer.from(body.toString('utf8').replaceAll('__CORS__', String(corsPort)));
     }
     res.writeHead(200, {
       'content-type': TYPES[path.extname(file)] || 'application/octet-stream',
       'access-control-allow-origin': '*',
-    }).end(fs.readFileSync(file));
+    }).end(body);
   });
   return new Promise((resolve) => server.listen(0, '127.0.0.1', () => {
     corsPort = server.address().port;
@@ -123,6 +150,47 @@ async function main() {
   await waitFor(warmup, () => document.documentElement.dataset.sdState !== undefined, 8000);
   await warmup.close();
 
+  // 0b. Strict CSP must not block the declaratively injected MAIN-world proxy.
+  await setStorage({ darkSites: {}, imageSites: {} });
+  const cspPage = await context.newPage();
+  const cspErrors = [];
+  cspPage.on('console', (message) => {
+    if (message.type() === 'error') cspErrors.push(message.text());
+  });
+  await cspPage.addInitScript(() => {
+    document.addEventListener('__darkreader__inlineScriptsAllowed', () => {
+      const count = Number(document.documentElement.dataset.sdProxySetupCount || 0) + 1;
+      document.documentElement.dataset.sdProxySetupCount = String(count);
+      document.documentElement.dataset.sdProxyReady = 'true';
+    });
+  });
+  await cspPage.goto(base + '/strict-csp/', { waitUntil: 'load' });
+  const cspState = await waitFor(cspPage, () => {
+    const raw = document.documentElement.dataset.sdState;
+    return raw ? JSON.parse(raw) : null;
+  }, 10000);
+  const proxyReady = await waitFor(cspPage, () => document.documentElement.dataset.sdProxyReady === 'true', 10000);
+  await cspPage.evaluate(() => {
+    document.querySelector('#late-styles').sheet.insertRule('.late-style-target { background-color: #fff; color: #111; }');
+  });
+  const lateStyle = await waitFor(cspPage, () => {
+    const target = document.querySelector('.late-style-target');
+    if (!target) return null;
+    const background = getComputedStyle(target).backgroundColor;
+    return background !== 'rgb(255, 255, 255)' ? background : null;
+  }, 10000);
+  const proxySetupCount = await cspPage.evaluate(() => Number(document.documentElement.dataset.sdProxySetupCount || 0));
+  const injectedProxyTags = await cspPage.locator('script.darkreader--proxy').count();
+  check('CSP: the declarative MAIN-world proxy is initialized exactly once', proxyReady && proxySetupCount === 1,
+    JSON.stringify({ proxySetupCount, cspState }));
+  check('CSP: no script element is injected into the page for proxy setup', injectedProxyTags === 0, String(injectedProxyTags));
+  check('CSP: dynamically inserted CSSStyleSheet rules are observed and recoloured', !!lateStyle, String(lateStyle));
+  check('CSP: no inline-script CSP violation is emitted',
+    !cspErrors.some((message) => /Executing inline script violates|Refused to execute inline script/i.test(message)),
+    JSON.stringify(cspErrors.filter((message) => /Content Security Policy|inline script/i.test(message))));
+  await cspPage.screenshot({ path: path.join(shots, 'compat-strict-csp.png'), fullPage: true });
+  await cspPage.close();
+
   // 1. factory dark detection on well-known variants
   for (const [slug, expected, label] of [
     ['light', false, 'light page'],
@@ -131,6 +199,11 @@ async function main() {
     ['light-color-scheme', false, 'color-scheme dark alone does not imply dark painted surfaces'],
     ['explicit-mode-dark', true, 'an explicit data-mode dark value remains recognised'],
     ['light-color-mode', false, 'an explicit data-color-mode light value remains recognised'],
+    ['mobilism', false, 'phpBB darkrow classes do not declare a dark site'],
+    ['notebook', false, 'Google Devsite class color-scheme--light remains a light site'],
+    ['openai-help', false, 'OpenAI Help Center article is measured as light'],
+    ['npm', false, 'npm package settings page is measured as light'],
+    ['gmail', false, 'Gmail-like mailbox shell is measured as light'],
     ['inline-important', false, 'email card with important inline background'],
     ['dark-attribute', true, 'data-theme dark page'],
     ['dark-body-class', true, 'body.dark page'],
@@ -202,6 +275,176 @@ async function main() {
     await page.close();
   }
 
+  // 1b. reported site families: theme application, typography and interactive surfaces.
+  for (const [slug, label] of [
+    ['mobilism', 'Mobilism/phpBB'],
+    ['notebook', 'Google Notebook docs'],
+    ['openai-help', 'OpenAI Help'],
+    ['npm', 'npm package settings'],
+    ['gmail', 'Gmail message'],
+  ]) {
+    await setStorage({ darkSites: { '127.0.0.1': true }, imageSites: {} });
+    const page = await context.newPage();
+    await page.goto(base + '/' + slug + '/', { waitUntil: 'load' });
+    const initial = await waitFor(page, () => {
+      const raw = document.documentElement.dataset.sdState;
+      if (!raw) return null;
+      const current = JSON.parse(raw);
+      return current.dark === true ? current : null;
+    }, 12000);
+    check('compatibility: ' + label + ' accepts the explicit dark switch', !!initial, JSON.stringify(initial));
+
+    if (slug === 'mobilism') {
+      const surfaces = await page.evaluate(() => ({
+        body: getComputedStyle(document.body).backgroundColor,
+        header: getComputedStyle(document.querySelector('header')).backgroundColor,
+        row: getComputedStyle(document.querySelector('.darkrow1')).backgroundColor,
+        link: getComputedStyle(document.querySelector('.darkrow1 a')).color,
+      }));
+      check('compatibility: Mobilism-style forum has a dark body and legible forum rows',
+        !!initial && surfaces.body !== 'rgb(243, 243, 243)'
+          && surfaces.row !== 'rgb(244, 244, 244)',
+        JSON.stringify(surfaces));
+    }
+
+    if (slug === 'notebook') {
+      const styles = await page.evaluate(() => ({
+        body: getComputedStyle(document.body).backgroundColor,
+        heading: getComputedStyle(document.querySelector('h1')).fontFamily,
+        header: getComputedStyle(document.querySelector('header')).backgroundColor,
+      }));
+      check('compatibility: Notebook docs darken while retaining Google font declarations',
+        !!initial && styles.body !== 'rgb(255, 255, 255)' && /Google Sans/i.test(styles.heading),
+        JSON.stringify(styles));
+    }
+
+    if (slug === 'openai-help') {
+      const styles = await page.evaluate(() => ({
+        body: getComputedStyle(document.body).backgroundColor,
+        card: getComputedStyle(document.querySelector('.article-card')).backgroundColor,
+        heading: getComputedStyle(document.querySelector('h1')).color,
+      }));
+      check('compatibility: OpenAI Help article surfaces are darkened',
+        !!initial && styles.body !== 'rgb(255, 255, 255)' && styles.card !== 'rgb(255, 255, 255)',
+        JSON.stringify(styles));
+    }
+
+    if (slug === 'npm') {
+      const styles = await page.evaluate(() => ({
+        headerBg: getComputedStyle(document.querySelector('header')).backgroundColor,
+        headerText: getComputedStyle(document.querySelector('header')).color,
+        bodyBg: getComputedStyle(document.querySelector('main')).backgroundColor,
+        packageBg: getComputedStyle(document.querySelector('.package')).backgroundColor,
+        packageText: getComputedStyle(document.querySelector('.package')).color,
+        description: getComputedStyle(document.querySelector('.description')).color,
+      }));
+      const rgb = (value) => value.match(/[\d.]+/g).slice(0, 3).map(Number);
+      const lum = (value) => {
+        const c = rgb(value).map((v) => v / 255).map((v) => v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4);
+        return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
+      };
+      check('compatibility: npm header and package list are consistently dark',
+        !!initial && lum(styles.headerBg) < 0.2 && lum(styles.bodyBg) < 0.2 && lum(styles.packageBg) < 0.35,
+        JSON.stringify(styles));
+      check('compatibility: npm package text remains readable on dark cards',
+        lum(styles.packageText) > lum(styles.packageBg) && lum(styles.description) > lum(styles.packageBg),
+        JSON.stringify(styles));
+    }
+
+    if (slug === 'gmail') {
+      const input = page.locator('input[aria-label="Search mail"]');
+      await setStorage({ darkSites: { '127.0.0.1': false }, imageSites: {} });
+      await waitFor(page, () => {
+        const raw = document.documentElement.dataset.sdState;
+        return raw && JSON.parse(raw).dark === false;
+      }, 8000);
+      await input.focus();
+      const lightFocus = await input.evaluate((element) => ({
+        active: document.activeElement === element,
+        transition: getComputedStyle(element).transitionDuration,
+      }));
+      await setStorage({ darkSites: { '127.0.0.1': true }, imageSites: {} });
+      const darkFocus = await waitFor(page, () => {
+        const element = document.querySelector('input[aria-label="Search mail"]');
+        const background = getComputedStyle(element).backgroundColor;
+        return document.activeElement === element && background !== 'rgb(255, 255, 255)'
+          ? {
+            active: document.activeElement === element,
+            background,
+            color: getComputedStyle(element).color,
+            transition: getComputedStyle(element).transitionDuration,
+            state: JSON.parse(document.documentElement.dataset.sdState || '{}'),
+          } : null;
+      }, 10000);
+      await page.waitForTimeout(220);
+      const banner = await page.locator('.banner td').first().evaluate((element) => ({
+        background: getComputedStyle(element).backgroundColor,
+        color: getComputedStyle(element).color,
+      }));
+      const toLum = (value) => {
+        const m = value.match(/[\d.]+/g).slice(0, 3).map((v) => Number(v) / 255);
+        const c = m.map((v) => v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4);
+        return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
+      };
+      check('compatibility: Gmail search keeps focus through theme activation', !!darkFocus && darkFocus.active,
+        JSON.stringify({ before: lightFocus, after: darkFocus }));
+      check('compatibility: Gmail focused search transition is disabled while dark mode is active',
+        !!darkFocus && darkFocus.transition.split(',').every((value) => value.trim() === '0s'),
+        JSON.stringify(darkFocus));
+      check('compatibility: Gmail focused search field stays dark and readable',
+        !!darkFocus && toLum(darkFocus.background) < 0.25 && toLum(darkFocus.color) > toLum(darkFocus.background),
+        JSON.stringify(darkFocus));
+      check('compatibility: Gmail email banner background and text stay contrasted',
+        toLum(banner.background) < 0.3 && toLum(banner.color) > toLum(banner.background),
+        JSON.stringify(banner));
+      await setStorage({ darkSites: { '127.0.0.1': false }, imageSites: {} });
+      const restoredTransition = await waitFor(page, () => {
+        const element = document.querySelector('input[aria-label="Search mail"]');
+        return getComputedStyle(element).transitionDuration === '0.18s, 0.18s'
+          ? getComputedStyle(element).transitionDuration : null;
+      }, 8000);
+      check('compatibility: Gmail search transition is restored when dark mode is turned off',
+        restoredTransition === '0.18s, 0.18s', String(restoredTransition));
+    }
+
+    await page.screenshot({ path: path.join(shots, 'compat-' + slug + '.png'), fullPage: true });
+    await page.close();
+  }
+
+  // 1c. The service-worker fetch bridge is exercised directly from the extension origin.
+  const bridgeSite = await context.newPage();
+  await bridgeSite.goto(base + '/light/', { waitUntil: 'load' });
+  await bridgeSite.evaluate(() => { document.cookie = 'smart-dark-bridge-test=present; SameSite=Lax'; });
+  const bridgeCookie = await bridgeSite.evaluate(() => document.cookie);
+  const bridgePage = await context.newPage();
+  await bridgePage.goto('chrome-extension://' + extId + '/popup.html', { waitUntil: 'load' });
+  const cdnURL = 'http://127.0.0.1:' + cdn.address().port;
+  lastCdnRequest = null;
+  const bridgeImage = await bridgePage.evaluate(async (url) => {
+    return await chrome.runtime.sendMessage({ type: 'wd-fetch-resource', url });
+  }, cdnURL + '/photo.jpg');
+  const imageRequest = lastCdnRequest;
+  const bridgeBytes = Buffer.from(bridgeImage && bridgeImage.body || '', 'base64').byteLength;
+  check('resource bridge: extension worker returns a cross-origin image as a data payload',
+    !!bridgeImage && bridgeImage.ok === true && bridgeImage.contentType === 'image/jpeg' && bridgeBytes > 1000,
+    JSON.stringify({ ok: bridgeImage && bridgeImage.ok, contentType: bridgeImage && bridgeImage.contentType, bytes: bridgeBytes }));
+  check('resource bridge: site cookies are omitted from cross-origin requests',
+    bridgeCookie.includes('smart-dark-bridge-test=present') && !!imageRequest && imageRequest.cookie === null,
+    JSON.stringify({ pageCookiePresent: bridgeCookie.includes('smart-dark-bridge-test=present'), requestCookie: imageRequest && imageRequest.cookie }));
+
+  lastCdnRequest = null;
+  const oversizedResource = await bridgePage.evaluate(async (url) => {
+    return await chrome.runtime.sendMessage({ type: 'wd-fetch-resource', url });
+  }, cdnURL + '/large.bin');
+  check('resource bridge: oversized response is cancelled at the streaming 16 MiB limit',
+    !!oversizedResource && oversizedResource.ok === false
+      && /16 MiB/.test(oversizedResource.error || '')
+      && !!lastCdnRequest && lastCdnRequest.url === '/large.bin',
+    JSON.stringify({ result: oversizedResource, request: lastCdnRequest }));
+  await bridgePage.close();
+  await bridgeSite.close();
+
+  // 2. live site with its own dark theme
   // 2. live site with its own dark theme
   await setStorage({ darkSites: {}, imageSites: {} });
   const kiro = await context.newPage();
@@ -210,9 +453,19 @@ async function main() {
     const info = await waitFor(kiro, () => (document.documentElement.dataset.sdState ? JSON.parse(document.documentElement.dataset.sdState) : null));
     check('live: native dark blog detected', info && info.factoryDark === true, JSON.stringify(info));
     check('live: theme stays off on native dark blog', info && info.dark === false);
+    const fetchInfo = await waitFor(kiro, () => {
+      const raw = document.documentElement.dataset.sdState;
+      if (!raw) return null;
+      const current = JSON.parse(raw);
+      return current.darkReaderFetchRequests > 0 || current.darkReaderFetchFailures > 0 ? current : null;
+    }, 10000);
+    check('live: cross-origin site resources use the extension fetch bridge',
+      !!fetchInfo && fetchInfo.darkReaderFetchRequests > 0 && fetchInfo.darkReaderFetchFailures === 0,
+      JSON.stringify(fetchInfo));
   } else {
     skip('live: native dark blog detected', 'site unreachable from the sandbox');
     skip('live: theme stays off on native dark blog', 'site unreachable from the sandbox');
+    skip('live: cross-origin site resources use the extension fetch bridge', 'site unreachable from the sandbox');
   }
 
   // 2b. a light page reached through a challenge screen must not be read as dark

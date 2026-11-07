@@ -1,0 +1,497 @@
+[
+  {
+    "name": "detection: light page",
+    "ok": true,
+    "detail": "{\"factoryDark\":false,\"detected\":true,\"dark\":true,\"reason\":\"measured-light\",\"imageError\":null,\"video\":false,\"invertCount\":0,\"styleKey\":\"false|\",\"reviewCount\":2,\"darkReaderFetch\":true,\"darkReaderFetchRequests\":0,\"darkReaderFetchFailures\":0}"
+  },
+  {
+    "name": "detection: light page gets the theme without manual action",
+    "ok": true,
+    "detail": "rgb(24, 26, 27)"
+  },
+  {
+    "name": "theme: the page font family is preserved",
+    "ok": true,
+    "detail": "Georgia, serif"
+  },
+  {
+    "name": "detection: short contentful page",
+    "ok": true,
+    "detail": "{\"factoryDark\":false,\"detected\":true,\"dark\":true,\"reason\":\"measured-light\",\"imageError\":null,\"video\":false,\"invertCount\":0,\"styleKey\":\"false|\",\"reviewCount\":2,\"darkReaderFetch\":true,\"darkReaderFetchRequests\":0,\"darkReaderFetchFailures\":0}"
+  },
+  {
+    "name": "detection: compact content is measured and themed",
+    "ok": true,
+    "detail": "{\"height\":19,\"state\":{\"factoryDark\":false,\"detected\":true,\"dark\":true,\"reason\":\"measured-light\",\"imageError\":null,\"video\":false,\"invertCount\":0,\"styleKey\":\"false|\",\"reviewCount\":2,\"darkReaderFetch\":true,\"darkReaderFetchRequests\":0,\"darkReaderFetchFailures\":0}}"
+  },
+  {
+    "name": "detection: empty generic mode attributes do not claim a dark theme",
+    "ok": true,
+    "detail": "{\"factoryDark\":false,\"detected\":true,\"dark\":true,\"reason\":\"measured-light\",\"imageError\":null,\"video\":false,\"invertCount\":0,\"styleKey\":\"false|\",\"reviewCount\":2,\"darkReaderFetch\":true,\"darkReaderFetchRequests\":0,\"darkReaderFetchFailures\":0}"
+  },
+  {
+    "name": "detection: color-scheme dark alone does not imply dark painted surfaces",
+    "ok": true,
+    "detail": "{\"factoryDark\":false,\"detected\":true,\"dark\":true,\"reason\":\"measured-light\",\"imageError\":null,\"video\":false,\"invertCount\":0,\"styleKey\":\"false|\",\"reviewCount\":2,\"darkReaderFetch\":true,\"darkReaderFetchRequests\":0,\"darkReaderFetchFailures\":0}"
+  },
+  {
+    "name": "detection: an explicit data-mode dark value remains recognised",
+    "ok": true,
+    "detail": "{\"factoryDark\":true,\"detected\":true,\"dark\":false,\"reason\":\"declared-dark\",\"imageError\":null,\"video\":false,\"invertCount\":0,\"styleKey\":\"true|\",\"reviewCount\":2,\"darkReaderFetch\":false,\"darkReaderFetchRequests\":0,\"darkReaderFetchFailures\":0}"
+  },
+  {
+    "name": "detection: an explicit data-color-mode light value remains recognised",
+    "ok": true,
+    "detail": "{\"factoryDark\":false,\"detected\":true,\"dark\":true,\"reason\":\"declared-light\",\"imageError\":null,\"video\":false,\"invertCount\":0,\"styleKey\":\"false|\",\"reviewCount\":2,\"darkReaderFetch\":true,\"darkReaderFetchRequests\":0,\"darkReaderFetchFailures\":0}"
+  },
+  {
+    "name": "detection: phpBB darkrow classes do not declare a dark site",
+    "ok": true,
+    "detail": "{\"factoryDark\":false,\"detected\":true,\"dark\":true,\"reason\":\"measured-light\",\"imageError\":null,\"video\":false,\"invertCount\":0,\"styleKey\":\"false|\",\"reviewCount\":2,\"darkReaderFetch\":true,\"darkReaderFetchRequests\":0,\"darkReaderFetchFailures\":0}"
+  },
+  {
+    "name": "detection: Google Devsite class color-scheme--light remains a light site",
+    "ok": true,
+    "detail": "{\"factoryDark\":false,\"detected\":true,\"dark\":true,\"reason\":\"declared-light\",\"imageError\":null,\"video\":false,\"invertCount\":0,\"styleKey\":\"false|\",\"reviewCount\":2,\"darkReaderFetch\":true,\"darkReaderFetchRequests\":0,\"darkReaderFetchFailures\":0}"
+  },
+  {
+    "name": "detection: OpenAI Help Center article is measured as light",
+    "ok": true,
+    "detail": "{\"factoryDark\":false,\"detected\":true,\"dark\":true,\"reason\":\"measured-light\",\"imageError\":null,\"video\":false,\"invertCount\":0,\"styleKey\":\"false|\",\"reviewCount\":2,\"darkReaderFetch\":true,\"darkReaderFetchRequests\":0,\"darkReaderFetchFailures\":0}"
+  },
+  {
+    "name": "detection: npm package settings page is measured as light",
+    "ok": true,
+    "detail": "{\"factoryDark\":false,\"detected\":true,\"dark\":true,\"reason\":\"measured-light\",\"imageError\":null,\"video\":false,\"invertCount\":0,\"styleKey\":\"false|\",\"reviewCount\":2,\"darkReaderFetch\":true,\"darkReaderFetchRequests\":0,\"darkReaderFetchFailures\":0}"
+  },
+  {
+    "name": "detection: Gmail-like mailbox shell is measured as light",
+    "ok": true,
+    "detail": "{\"factoryDark\":false,\"detected\":true,\"dark\":true,\"reason\":\"measured-light\",\"imageError\":null,\"video\":false,\"invertCount\":0,\"styleKey\":\"false|\",\"reviewCount\":2,\"darkReaderFetch\":true,\"darkReaderFetchRequests\":0,\"darkReaderFetchFailures\":0}"
+  },
+  {
+    "name": "detection: email card with important inline background",
+    "ok": true,
+    "detail": "{\"factoryDark\":false,\"detected\":true,\"dark\":true,\"reason\":\"measured-light\",\"imageError\":null,\"video\":false,\"invertCount\":0,\"styleKey\":\"false|\",\"reviewCount\":3,\"darkReaderFetch\":true,\"darkReaderFetchRequests\":0,\"darkReaderFetchFailures\":0}"
+  },
+  {
+    "name": "inline-important: message background is darkened",
+    "ok": true,
+    "detail": "{\"background\":\"rgb(24, 26, 27)\",\"priority\":\"important\",\"color\":\"rgb(200, 195, 188)\",\"state\":{\"factoryDark\":false,\"detected\":true,\"dark\":true,\"reason\":\"measured-light\",\"imageError\":null,\"video\":false,\"invertCount\":0,\"styleKey\":\"false|\",\"reviewCount\":3,\"darkReaderFetch\":true,\"darkReaderFetchRequests\":0,\"darkReaderFetchFailures\":0}}"
+  },
+  {
+    "name": "inline-important: original inline style is restored when the theme is off",
+    "ok": true,
+    "detail": "{\"background\":\"rgb(255, 255, 255)\",\"shorthand\":\"rgb(255, 255, 255)\",\"shorthandPriority\":\"important\",\"styleAttribute\":\"width: 510px; margin: 0px auto; padding: 20px; border: 1px solid rgb(221, 221, 221); border-radius: 3px; color: rgb(51, 51, 51); --darkreader-inline-border-top: var(--darkreader-border-dddddd, #3a3e41); --darkreader-inline-border-right: var(--darkreader-border-dddddd, #3a3e41); --darkreader-inline-border-bottom: var(--darkreader-border-dddddd, #3a3e41); --darkreader-inline-border-left: var(--darkreader-border-dddddd, #3a3e41); --darkreader-inline-color: var(--darkreader-text-333333, #c8c3bc); --darkreader-inline-bgimage: initial; --darkreader-inline-bgcolor: var(--darkreader-background-181a1b, #131516); background: rgb(255, 255, 255) !important;\"}"
+  },
+  {
+    "name": "inline-important: converted background returns when the theme is on again",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "detection: data-theme dark page",
+    "ok": true,
+    "detail": "{\"factoryDark\":true,\"detected\":true,\"dark\":false,\"reason\":\"declared-dark\",\"imageError\":null,\"video\":false,\"invertCount\":0,\"styleKey\":\"true|\",\"reviewCount\":2,\"darkReaderFetch\":false,\"darkReaderFetchRequests\":0,\"darkReaderFetchFailures\":0}"
+  },
+  {
+    "name": "detection: body.dark page",
+    "ok": true,
+    "detail": "{\"factoryDark\":true,\"detected\":true,\"dark\":false,\"reason\":\"declared-dark\",\"imageError\":null,\"video\":false,\"invertCount\":0,\"styleKey\":\"true|\",\"reviewCount\":2,\"darkReaderFetch\":false,\"darkReaderFetchRequests\":0,\"darkReaderFetchFailures\":0}"
+  },
+  {
+    "name": "detection: page whose dark canvas is painted by gradients",
+    "ok": true,
+    "detail": "{\"factoryDark\":true,\"detected\":true,\"dark\":false,\"reason\":\"measured-dark\",\"imageError\":null,\"video\":false,\"invertCount\":0,\"styleKey\":\"true|\",\"reviewCount\":2,\"darkReaderFetch\":false,\"darkReaderFetchRequests\":0,\"darkReaderFetchFailures\":0}"
+  },
+  {
+    "name": "detection: page with a dark hero only",
+    "ok": true,
+    "detail": "{\"factoryDark\":false,\"detected\":true,\"dark\":true,\"reason\":\"measured-light\",\"imageError\":null,\"video\":false,\"invertCount\":0,\"styleKey\":\"false|\",\"reviewCount\":2,\"darkReaderFetch\":true,\"darkReaderFetchRequests\":0,\"darkReaderFetchFailures\":0}"
+  },
+  {
+    "name": "compatibility: Mobilism/phpBB accepts the explicit dark switch",
+    "ok": true,
+    "detail": "{\"factoryDark\":false,\"detected\":true,\"dark\":true,\"reason\":\"measured-light\",\"imageError\":null,\"video\":false,\"invertCount\":0,\"styleKey\":\"false|\",\"reviewCount\":2,\"darkReaderFetch\":true,\"darkReaderFetchRequests\":0,\"darkReaderFetchFailures\":0}"
+  },
+  {
+    "name": "compatibility: Mobilism-style forum has a dark body and legible forum rows",
+    "ok": true,
+    "detail": "{\"body\":\"rgb(31, 33, 35)\",\"header\":\"rgb(28, 30, 31)\",\"row\":\"rgb(30, 33, 34)\",\"link\":\"rgb(140, 193, 233)\"}"
+  },
+  {
+    "name": "compatibility: Google Notebook docs accepts the explicit dark switch",
+    "ok": true,
+    "detail": "{\"factoryDark\":false,\"detected\":true,\"dark\":true,\"reason\":\"declared-light\",\"imageError\":null,\"video\":false,\"invertCount\":0,\"styleKey\":\"false|\",\"reviewCount\":2,\"darkReaderFetch\":true,\"darkReaderFetchRequests\":0,\"darkReaderFetchFailures\":0}"
+  },
+  {
+    "name": "compatibility: Notebook docs darken while retaining Google font declarations",
+    "ok": true,
+    "detail": "{\"body\":\"rgb(24, 26, 27)\",\"heading\":\"\\\"Google Sans\\\", Roboto, Arial, sans-serif\",\"header\":\"rgb(24, 26, 27)\"}"
+  },
+  {
+    "name": "compatibility: OpenAI Help accepts the explicit dark switch",
+    "ok": true,
+    "detail": "{\"factoryDark\":false,\"detected\":true,\"dark\":true,\"reason\":\"measured-light\",\"imageError\":null,\"video\":false,\"invertCount\":0,\"styleKey\":\"false|\",\"reviewCount\":2,\"darkReaderFetch\":true,\"darkReaderFetchRequests\":0,\"darkReaderFetchFailures\":0}"
+  },
+  {
+    "name": "compatibility: OpenAI Help article surfaces are darkened",
+    "ok": true,
+    "detail": "{\"body\":\"rgb(24, 26, 27)\",\"card\":\"rgb(24, 26, 27)\",\"heading\":\"rgb(216, 213, 208)\"}"
+  },
+  {
+    "name": "compatibility: npm package settings accepts the explicit dark switch",
+    "ok": true,
+    "detail": "{\"factoryDark\":false,\"detected\":true,\"dark\":true,\"reason\":\"measured-light\",\"imageError\":null,\"video\":false,\"invertCount\":0,\"styleKey\":\"false|\",\"reviewCount\":2,\"darkReaderFetch\":true,\"darkReaderFetchRequests\":0,\"darkReaderFetchFailures\":0}"
+  },
+  {
+    "name": "compatibility: npm header and package list are consistently dark",
+    "ok": true,
+    "detail": "{\"headerBg\":\"rgb(24, 26, 27)\",\"headerText\":\"rgb(206, 202, 195)\",\"bodyBg\":\"rgb(24, 26, 27)\",\"packageBg\":\"rgb(29, 31, 32)\",\"packageText\":\"rgb(206, 202, 195)\",\"description\":\"rgb(171, 164, 153)\"}"
+  },
+  {
+    "name": "compatibility: npm package text remains readable on dark cards",
+    "ok": true,
+    "detail": "{\"headerBg\":\"rgb(24, 26, 27)\",\"headerText\":\"rgb(206, 202, 195)\",\"bodyBg\":\"rgb(24, 26, 27)\",\"packageBg\":\"rgb(29, 31, 32)\",\"packageText\":\"rgb(206, 202, 195)\",\"description\":\"rgb(171, 164, 153)\"}"
+  },
+  {
+    "name": "compatibility: Gmail message accepts the explicit dark switch",
+    "ok": true,
+    "detail": "{\"factoryDark\":false,\"detected\":true,\"dark\":true,\"reason\":\"measured-light\",\"imageError\":null,\"video\":false,\"invertCount\":0,\"styleKey\":\"false|\",\"reviewCount\":2,\"darkReaderFetch\":true,\"darkReaderFetchRequests\":0,\"darkReaderFetchFailures\":0}"
+  },
+  {
+    "name": "compatibility: Gmail search keeps focus through theme activation",
+    "ok": true,
+    "detail": "{\"before\":{\"active\":true,\"transition\":\"0.18s, 0.18s\"},\"after\":{\"active\":true,\"background\":\"rgb(24, 26, 27)\",\"color\":\"rgb(211, 207, 201)\",\"transition\":\"0s\",\"state\":{\"factoryDark\":false,\"detected\":true,\"dark\":true,\"reason\":\"measured-light\",\"imageError\":null,\"video\":false,\"invertCount\":0,\"styleKey\":\"false|\",\"reviewCount\":4,\"darkReaderFetch\":true,\"darkReaderFetchRequests\":0,\"darkReaderFetchFailures\":0}}}"
+  },
+  {
+    "name": "compatibility: Gmail focused search transition is disabled while dark mode is active",
+    "ok": true,
+    "detail": "{\"active\":true,\"background\":\"rgb(24, 26, 27)\",\"color\":\"rgb(211, 207, 201)\",\"transition\":\"0s\",\"state\":{\"factoryDark\":false,\"detected\":true,\"dark\":true,\"reason\":\"measured-light\",\"imageError\":null,\"video\":false,\"invertCount\":0,\"styleKey\":\"false|\",\"reviewCount\":4,\"darkReaderFetch\":true,\"darkReaderFetchRequests\":0,\"darkReaderFetchFailures\":0}}"
+  },
+  {
+    "name": "compatibility: Gmail focused search field stays dark and readable",
+    "ok": true,
+    "detail": "{\"active\":true,\"background\":\"rgb(24, 26, 27)\",\"color\":\"rgb(211, 207, 201)\",\"transition\":\"0s\",\"state\":{\"factoryDark\":false,\"detected\":true,\"dark\":true,\"reason\":\"measured-light\",\"imageError\":null,\"video\":false,\"invertCount\":0,\"styleKey\":\"false|\",\"reviewCount\":4,\"darkReaderFetch\":true,\"darkReaderFetchRequests\":0,\"darkReaderFetchFailures\":0}}"
+  },
+  {
+    "name": "compatibility: Gmail email banner background and text stay contrasted",
+    "ok": true,
+    "detail": "{\"background\":\"rgb(30, 32, 34)\",\"color\":\"rgb(211, 207, 201)\"}"
+  },
+  {
+    "name": "compatibility: Gmail search transition is restored when dark mode is turned off",
+    "ok": true,
+    "detail": "0.18s, 0.18s"
+  },
+  {
+    "name": "resource bridge: extension worker returns a cross-origin image as a data payload",
+    "ok": true,
+    "detail": "{\"ok\":true,\"contentType\":\"image/jpeg\",\"bytes\":163707}"
+  },
+  {
+    "name": "resource bridge: site cookies are omitted from cross-origin requests",
+    "ok": true,
+    "detail": "{\"pageCookiePresent\":true,\"requestCookie\":null}"
+  },
+  {
+    "name": "resource bridge: oversized response is cancelled at the streaming 16 MiB limit",
+    "ok": true,
+    "detail": "{\"result\":{\"ok\":false,\"error\":\"Resource exceeds the 16 MiB fetch limit\"},\"request\":{\"url\":\"/large.bin\",\"cookie\":null}}"
+  },
+  {
+    "name": "live: native dark blog detected",
+    "ok": true,
+    "detail": "{\"factoryDark\":true,\"detected\":true,\"dark\":false,\"reason\":\"declared-dark\",\"imageError\":null,\"video\":false,\"invertCount\":0,\"styleKey\":\"true|\",\"reviewCount\":2,\"darkReaderFetch\":true,\"darkReaderFetchRequests\":1,\"darkReaderFetchFailures\":0}"
+  },
+  {
+    "name": "live: theme stays off on native dark blog",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "live: cross-origin site resources use the extension fetch bridge",
+    "ok": true,
+    "detail": "{\"factoryDark\":true,\"detected\":true,\"dark\":false,\"reason\":\"declared-dark\",\"imageError\":null,\"video\":false,\"invertCount\":0,\"styleKey\":\"true|\",\"reviewCount\":2,\"darkReaderFetch\":true,\"darkReaderFetchRequests\":1,\"darkReaderFetchFailures\":0}"
+  },
+  {
+    "name": "live: article diagrams converted on a native dark site",
+    "ok": true,
+    "detail": "{\"started\":14,\"converted\":4,\"reasons\":{\"small\":5,\"unprocessed\":4,\"not-visible\":1}}"
+  },
+  {
+    "name": "live: no image left in a failed state",
+    "ok": true,
+    "detail": "[]"
+  },
+  {
+    "name": "live: every skipped image says why",
+    "ok": true,
+    "detail": "[\"not-visible\",\"small\",\"small\",\"small\",\"small\",\"small\"]"
+  },
+  {
+    "name": "youtube: the dark theme announced on <html> is picked up",
+    "ok": true,
+    "detail": "{\"factoryDark\":true,\"detected\":true,\"dark\":false,\"reason\":\"declared-dark\",\"imageError\":null,\"video\":true,\"invertCount\":0,\"styleKey\":\"true|\",\"reviewCount\":2,\"darkReaderFetch\":false,\"darkReaderFetchRequests\":0,\"darkReaderFetchFailures\":0}"
+  },
+  {
+    "name": "youtube: no layer of our theme is painted over the page",
+    "ok": true,
+    "detail": "{\"factoryDark\":true,\"detected\":true,\"dark\":false,\"reason\":\"declared-dark\",\"imageError\":null,\"video\":true,\"invertCount\":0,\"styleKey\":\"true|\",\"reviewCount\":2,\"darkReaderFetch\":false,\"darkReaderFetchRequests\":0,\"darkReaderFetchFailures\":0}"
+  },
+  {
+    "name": "youtube: the clip is never inverted",
+    "ok": true,
+    "detail": "{\"video\":\"none\",\"player\":\"none\",\"chain\":0}"
+  },
+  {
+    "name": "youtube: no container filter reaches the video",
+    "ok": true,
+    "detail": "{\"video\":\"none\",\"player\":\"none\",\"chain\":0}"
+  },
+  {
+    "name": "late theme: a shell that is light before its theme arrives is not judged light",
+    "ok": true,
+    "detail": "{\"early\":{\"factoryDark\":false,\"detected\":true,\"dark\":true,\"reason\":\"measured-light\",\"imageError\":null,\"video\":false,\"invertCount\":0,\"styleKey\":\"false|\",\"reviewCount\":2,\"darkReaderFetch\":true,\"darkReaderFetchRequests\":0,\"darkReaderFetchFailures\":0},\"settled\":{\"factoryDark\":true,\"detected\":true,\"dark\":false,\"reason\":\"declared-dark\",\"imageError\":null,\"video\":false,\"invertCount\":0,\"styleKey\":\"true|\",\"reviewCount\":4,\"darkReaderFetch\":true,\"darkReaderFetchRequests\":0,\"darkReaderFetchFailures\":0}}"
+  },
+  {
+    "name": "late theme: the theme layer is off once the site is known to be dark",
+    "ok": true,
+    "detail": "{\"factoryDark\":true,\"detected\":true,\"dark\":false,\"reason\":\"declared-dark\",\"imageError\":null,\"video\":false,\"invertCount\":0,\"styleKey\":\"true|\",\"reviewCount\":4,\"darkReaderFetch\":true,\"darkReaderFetchRequests\":0,\"darkReaderFetchFailures\":0}"
+  },
+  {
+    "name": "late theme: an undeclared theme is found by a second measurement",
+    "ok": true,
+    "detail": "{\"factoryDark\":true,\"detected\":true,\"dark\":false,\"reason\":\"measured-dark\",\"imageError\":null,\"video\":false,\"invertCount\":0,\"styleKey\":\"true|\",\"reviewCount\":4,\"darkReaderFetch\":true,\"darkReaderFetchRequests\":0,\"darkReaderFetchFailures\":0}"
+  },
+  {
+    "name": "observer: unrelated subtree churn does not re-run theme detection",
+    "ok": true,
+    "detail": "{\"before\":5,\"after\":5}"
+  },
+  {
+    "name": "observer: a root theme attribute change is still detected",
+    "ok": true,
+    "detail": "{\"factoryDark\":true,\"detected\":true,\"dark\":false,\"reason\":\"declared-dark\",\"imageError\":null,\"video\":false,\"invertCount\":0,\"styleKey\":\"true|\",\"reviewCount\":6,\"darkReaderFetch\":true,\"darkReaderFetchRequests\":0,\"darkReaderFetchFailures\":0}"
+  },
+  {
+    "name": "observer: a body theme class change is still detected",
+    "ok": true,
+    "detail": "{\"factoryDark\":true,\"detected\":true,\"dark\":false,\"reason\":\"declared-dark\",\"imageError\":null,\"video\":false,\"invertCount\":0,\"styleKey\":\"true|\",\"reviewCount\":6,\"darkReaderFetch\":true,\"darkReaderFetchRequests\":0,\"darkReaderFetchFailures\":0}"
+  },
+  {
+    "name": "observer: a root data-color-mode light value is detected",
+    "ok": true,
+    "detail": "{\"factoryDark\":false,\"detected\":true,\"dark\":true,\"reason\":\"declared-light\",\"imageError\":null,\"video\":false,\"invertCount\":0,\"styleKey\":\"false|\",\"reviewCount\":7,\"darkReaderFetch\":true,\"darkReaderFetchRequests\":0,\"darkReaderFetchFailures\":0}"
+  },
+  {
+    "name": "observer: a dynamically added color-scheme meta is detected",
+    "ok": true,
+    "detail": "{\"factoryDark\":true,\"detected\":true,\"dark\":false,\"reason\":\"declared-dark\",\"imageError\":null,\"video\":false,\"invertCount\":0,\"styleKey\":\"true|\",\"reviewCount\":8,\"darkReaderFetch\":true,\"darkReaderFetchRequests\":0,\"darkReaderFetchFailures\":0}"
+  },
+  {
+    "name": "observer: an empty explicit data-dark flag is detected",
+    "ok": true,
+    "detail": "{\"factoryDark\":true,\"detected\":true,\"dark\":false,\"reason\":\"declared-dark\",\"imageError\":null,\"video\":false,\"invertCount\":0,\"styleKey\":\"true|\",\"reviewCount\":8,\"darkReaderFetch\":true,\"darkReaderFetchRequests\":0,\"darkReaderFetchFailures\":0}"
+  },
+  {
+    "name": "images: photo, diagrams and logo classified separately",
+    "ok": true,
+    "detail": "[\"photo\",\"graphic\",\"graphic\",\"graphic\",\"icon\"]"
+  },
+  {
+    "name": "images: transparent logo treated as an icon",
+    "ok": true,
+    "detail": "[\"photo\",\"graphic\",\"graphic\",\"graphic\",\"icon\"]"
+  },
+  {
+    "name": "images: photo keeps midtone range",
+    "ok": true,
+    "detail": "{\"kind\":\"photo\",\"mean\":134,\"alpha\":255}"
+  },
+  {
+    "name": "images: diagram background moved into the dark band",
+    "ok": true,
+    "detail": "{\"kind\":\"graphic\",\"mean\":40,\"alpha\":255}"
+  },
+  {
+    "name": "images: icon transparency preserved",
+    "ok": true,
+    "detail": "{\"kind\":\"icon\",\"mean\":74,\"alpha\":0}"
+  },
+  {
+    "name": "images: an already dark photo is left alone",
+    "ok": true,
+    "detail": "{\"skip\":\"already-dark\",\"done\":\"\",\"source\":\"\"}"
+  },
+  {
+    "name": "images: a recycled card converts its new source instead of restoring the previous picture",
+    "ok": true,
+    "detail": "{\"initial\":\"http://127.0.0.1:62643/images/photo.jpg\",\"updated\":{\"source\":\"http://127.0.0.1:62643/images/banner.png\",\"shown\":true},\"debug\":null}"
+  },
+  {
+    "name": "images: stopping after a recycle restores the new original source",
+    "ok": true,
+    "detail": "{\"src\":\"banner.png\",\"done\":\"\"}"
+  },
+  {
+    "name": "images: high-resolution input is downscaled before pixel processing",
+    "ok": true,
+    "detail": "{\"original\":{\"width\":2800,\"height\":1200},\"output\":{\"kind\":\"graphic\",\"width\":2200,\"height\":943}}"
+  },
+  {
+    "name": "images: a permissive CDN is read without credentials",
+    "ok": true,
+    "detail": "{\"done\":\"graphic\",\"info\":\"graphic/18/0.34/1.00\"}"
+  },
+  {
+    "name": "images: a <picture> shows the dark frame, not the original source",
+    "ok": true,
+    "detail": "{\"done\":\"graphic\",\"shown\":\"blob\",\"parked\":\"[\\\"banner.png\\\"]\"}"
+  },
+  {
+    "name": "images: the picture is converted again once images are back on",
+    "ok": true,
+    "detail": "{\"locked\":true}"
+  },
+  {
+    "name": "images: a re-render that restores srcset does not bring the light original back",
+    "ok": true,
+    "detail": "{\"shown\":\"blob\",\"srcset\":false,\"sources\":0,\"fought\":true}"
+  },
+  {
+    "name": "images: hide restores original <source>, src, sizes and inline filter",
+    "ok": true,
+    "detail": "{\"srcset\":true,\"src\":\"banner.png\",\"sizes\":\"(max-width: 760px) 100vw, 760px\",\"filter\":\"sepia(0.2)\",\"filterPriority\":\"important\",\"marker\":false}"
+  },
+  {
+    "name": "images: delayed conversion enters the cancellable pending state",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "images: stopping conversion prevents a late blob swap",
+    "ok": true,
+    "detail": "{\"done\":\"\",\"pending\":\"\",\"src\":\"photo.jpg?delay=1800\",\"blob\":\"\"}"
+  },
+  {
+    "name": "images: a lazy 1x1 stand-in is not converted — the real frame is",
+    "ok": true,
+    "detail": "{\"state\":\"photo\",\"natural\":\"1200x801\",\"parked\":true,\"size\":64}"
+  },
+  {
+    "name": "images: dark art with light lettering is dimmed, not inverted",
+    "ok": true,
+    "detail": "{\"state\":\"dim\",\"kind\":\"dim\",\"mean\":0.22260558431373084,\"light\":0.16333333333333333}"
+  },
+  {
+    "name": "images: a flat dark strip is never inverted",
+    "ok": true,
+    "detail": "{\"state\":\"skip:already-dark\",\"kind\":\"\",\"mean\":0.09768415359476967,\"light\":0}"
+  },
+  {
+    "name": "images: a bright control photograph is still darkened",
+    "ok": true,
+    "detail": "{\"state\":\"photo\",\"kind\":\"photo\",\"mean\":0.38008126683006305,\"light\":0.2947916666666667}"
+  },
+  {
+    "name": "video: forced theme is applied",
+    "ok": true,
+    "detail": "{\"factoryDark\":false,\"detected\":true,\"dark\":true,\"reason\":\"measured-light\",\"imageError\":null,\"video\":true,\"invertCount\":0,\"styleKey\":\"false|\",\"reviewCount\":2,\"darkReaderFetch\":true,\"darkReaderFetchRequests\":0,\"darkReaderFetchFailures\":0}"
+  },
+  {
+    "name": "video: an inverted player wrapper does not invert the clip",
+    "ok": true,
+    "detail": "{\"player\":\"invert(1) hue-rotate(180deg)\",\"video\":\"none\"}"
+  },
+  {
+    "name": "video: a native dark site keeps its player un-inverted",
+    "ok": true,
+    "detail": "none"
+  },
+  {
+    "name": "popup targets the active site",
+    "ok": true,
+    "detail": "127.0.0.1 тёмная тема включена Затемнять сайт 127.0.0.1 Затемнять изображения на 127.0.0.1"
+  },
+  {
+    "name": "popup uses the requested labels",
+    "ok": true,
+    "detail": "[\"Затемнять сайт 127.0.0.1\",\"Затемнять изображения на 127.0.0.1\"]"
+  },
+  {
+    "name": "popup reflects the auto-enabled theme",
+    "ok": true,
+    "detail": "{\"dark\":true,\"images\":true}"
+  },
+  {
+    "name": "images are on by default",
+    "ok": true,
+    "detail": "{\"dark\":true,\"images\":true}"
+  },
+  {
+    "name": "footer is hidden while it has nothing to offer",
+    "ok": true,
+    "detail": "{\"hidden\":true,\"display\":\"none\",\"height\":0,\"text\":\"Проверить снова\"}"
+  },
+  {
+    "name": "popup shows the icon asset",
+    "ok": true,
+    "detail": "{\"matches\":true,\"url\":\"chrome-extension://eonoodnfiahfhcbkgppfkdcbkoebembc/icons/icon-32.png\"}"
+  },
+  {
+    "name": "dark switch state is persisted",
+    "ok": true,
+    "detail": "{\"127.0.0.1\":false}"
+  },
+  {
+    "name": "image switch can be turned off and is persisted",
+    "ok": true,
+    "detail": "{\"127.0.0.1\":false}"
+  },
+  {
+    "name": "popup restores saved switch states",
+    "ok": true,
+    "detail": "{\"dark\":false,\"images\":false}"
+  },
+  {
+    "name": "site layer follows the switch",
+    "ok": true,
+    "detail": "{\"factoryDark\":false,\"detected\":true,\"dark\":false,\"reason\":\"measured-light\",\"imageError\":null,\"video\":false,\"invertCount\":0,\"styleKey\":\"false|\",\"reviewCount\":7,\"darkReaderFetch\":true,\"darkReaderFetchRequests\":0,\"darkReaderFetchFailures\":0}"
+  },
+  {
+    "name": "docs: every skip reason the code can emit is specified",
+    "ok": true,
+    "detail": "[]"
+  },
+  {
+    "name": "docs: every verdict is specified",
+    "ok": true,
+    "detail": "[]"
+  },
+  {
+    "name": "docs: the rejection and skip limits are named in the spec",
+    "ok": true,
+    "detail": "[]"
+  },
+  {
+    "name": "CSP: the declarative MAIN-world proxy is initialized exactly once",
+    "ok": true,
+    "detail": "{\"proxySetupCount\":1}"
+  },
+  {
+    "name": "CSP: no script element is injected into the page for proxy setup",
+    "ok": true,
+    "detail": "0"
+  },
+  {
+    "name": "CSP: dynamically inserted CSSStyleSheet rules are observed and recoloured",
+    "ok": true,
+    "detail": "rgb(24, 26, 27)"
+  },
+  {
+    "name": "CSP: no inline-script CSP violation is emitted",
+    "ok": true,
+    "detail": "[]"
+  }
+]

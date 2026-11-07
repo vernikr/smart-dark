@@ -1,0 +1,16 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Strict CSP style proxy</title>
+  <style id="late-styles"></style>
+  <style>
+    body { margin: 0; padding: 40px; background: #fff; color: #111; font: 16px/1.5 Georgia, serif; }
+    .late-style-target { padding: 24px; background: #fff; color: #111; border: 1px solid #ddd; }
+  </style>
+</head>
+<body>
+  <h1>Strict Content Security Policy</h1>
+  <p class="late-style-target">This rule is inserted dynamically through CSSStyleSheet.insertRule().</p>
+</body>
+</html>

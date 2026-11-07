@@ -109,6 +109,26 @@ One dark hero banner or sidebar therefore cannot decide the verdict for the whol
 - **Theme settings** (THEME): brightness/contrast 100, no grayscale or sepia, no forced page font, Dark Reader's
   background/text pairs, system controls themed. The original site typography is preserved.
 
+**Gmail search focus.** While the site layer is enabled, a small compatibility style disables the background transition
+on input with aria-label equal to Search mail. Gmail animates the search field between its resting and focused surfaces;
+changing the page theme during that transition can expose a brief light frame. The rule affects only the Gmail search
+control and is removed when the site layer is disabled.
+
+**CSP-compatible Dark Reader proxy.** Dark Reader needs a small MAIN-world proxy to observe CSSOM changes made
+through CSSStyleSheet.insertRule(), adopted stylesheets and custom-element registration. Its upstream bundle normally
+creates this proxy by inserting an inline script, which strict page script-src policies can block. The build extracts
+the upstream proxy function into darkreader-proxy-main.js and registers it declaratively as a Chrome MAIN-world content
+script at document_start. The isolated Dark Reader runtime requests setup through a DOM event carrying two boolean flags.
+The proxy code executes in the page's MAIN world without creating a script element or relaxing the page's CSP.
+
+**Embedded Dark Reader resource loading.** Before activating Dark Reader, Smart Dark installs a fetch adapter that
+uses the extension service worker rather than page-origin fetch. The service worker fetches cross-origin stylesheets,
+images and fonts with credentials omitted under the extension's host permissions, enforces a streaming 16 MiB response
+limit, and returns a normal Response to the embedded runtime. This avoids the embedded runtime's default CORS rejection
+and keeps site cookies out of public resource requests. The original runtime messaging method is captured before Dark
+Reader wraps it, so this bridge does not recurse through the embedded message shim. The declarative MAIN-world proxy above
+also keeps CSSOM observation available on pages with strict script-src policies; the page's policy is left unchanged.
+
 **Inline-important backgrounds.** Dark Reader can mark an element with data-darkreader-inline-bgcolor while its
 stylesheet conversion still loses to the page's inline background or background-color declaration with important.
 For those marked elements only, the extension temporarily applies Dark Reader's resolved computed background as inline

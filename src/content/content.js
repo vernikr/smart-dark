@@ -54,6 +54,55 @@
     return state.fixes.invert.filter((selector) => !MEDIA_CONTAINER.test(selector));
   }
 
+  let darkReaderFetchConfigured = false;
+  let darkReaderFetchRequests = 0;
+  let darkReaderFetchFailures = 0;
+
+  /* The embedded Dark Reader defaults to rejecting cross-origin resource requests. This bridge uses the extension
+     service worker's host permissions and omits site cookies from CDN requests. */
+  function configureDarkReaderFetch() {
+    if (darkReaderFetchConfigured || !window.DarkReader || typeof window.DarkReader.setFetchMethod !== 'function') return;
+    if (!window.WD.nativeSendMessage) return;
+    window.DarkReader.setFetchMethod(async (url) => {
+      darkReaderFetchRequests++;
+      document.documentElement.dataset.sdFetchRequests = String(darkReaderFetchRequests);
+      try {
+        const result = await window.WD.nativeSendMessage({ type: 'wd-fetch-resource', url });
+        if (!result || !result.ok || typeof result.body !== 'string') {
+          throw new Error(result && result.error ? result.error : 'Background resource fetch failed');
+        }
+        const binary = atob(result.body);
+        const bytes = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+        document.documentElement.dataset.sdFetchFailures = String(darkReaderFetchFailures);
+        return new Response(bytes, { headers: { 'content-type': result.contentType || 'application/octet-stream' } });
+      } catch (error) {
+        darkReaderFetchFailures++;
+        document.documentElement.dataset.sdFetchFailures = String(darkReaderFetchFailures);
+        throw error;
+      }
+    });
+    darkReaderFetchConfigured = true;
+  }
+
+  const SITE_COMPAT_STYLE_ID = 'smart-dark-site-compatibility';
+
+  /* Gmail animates its search field between the light and focused backgrounds. During a theme switch that
+     transition exposes a brief white flash. This narrow accessible-name selector is inert on pages without Gmail's
+     search field, so the rule can be installed before the mail application finishes mounting its controls. */
+  function updateSiteCompatibilityStyles(enabled) {
+    const existing = document.getElementById(SITE_COMPAT_STYLE_ID);
+    if (!enabled) {
+      if (existing) existing.remove();
+      return;
+    }
+    if (existing) return;
+    const style = document.createElement('style');
+    style.id = SITE_COMPAT_STYLE_ID;
+    style.textContent = 'input[aria-label="Search mail"] { transition: none !important; }';
+    (document.head || document.documentElement).appendChild(style);
+  }
+
   const INLINE_BG_COLOR = 'var(--darkreader-inline-bgcolor)';
   const inlineBackgroundOverrides = new Map();
   let inlineBackgroundObserver = null;
@@ -189,6 +238,7 @@
 
   function applyTheme(on) {
     if (!window.DarkReader) return;
+    updateSiteCompatibilityStyles(on);
     const fixes = fixesFor(state.factoryDark);
     const invert = invertSelectors();
     const key = `${state.factoryDark}|${invert.join('|')}`;
@@ -196,6 +246,7 @@
     if (state.darkApplied === on && state.styleKey === key) return;
     try {
       if (on) {
+        configureDarkReaderFetch();
         const ignore = [...MEDIA_SAFE, ...fixes.ignore];
         window.DarkReader.enable(THEME, { invert, ignoreImageAnalysis: ignore });
         watchInlineImportantBackgrounds();
@@ -243,6 +294,9 @@
       invertCount: invertSelectors().length,
       styleKey: state.styleKey || null,
       reviewCount: state.reviewCount,
+      darkReaderFetch: darkReaderFetchConfigured,
+      darkReaderFetchRequests,
+      darkReaderFetchFailures,
     });
   }
 
@@ -304,8 +358,8 @@
     if (!node) return false;
     const element = node.nodeType === Node.ELEMENT_NODE ? node : node.parentElement;
     if (!element) return false;
-    const style = element.closest && element.closest('style.darkreader, #smart-dark-images');
-    return !!style || !!(element.matches && element.matches('style.darkreader, #smart-dark-images'));
+    const style = element.closest && element.closest('style.darkreader, #smart-dark-images, #smart-dark-site-compatibility');
+    return !!style || !!(element.matches && element.matches('style.darkreader, #smart-dark-images, #smart-dark-site-compatibility'));
   }
 
   function detect() {

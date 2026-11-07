@@ -54,6 +54,24 @@
     return state.fixes.invert.filter((selector) => !MEDIA_CONTAINER.test(selector));
   }
 
+  const SITE_COMPAT_STYLE_ID = 'smart-dark-site-compatibility';
+
+  /* Gmail animates its search field between the light and focused backgrounds. During a theme switch that
+     transition exposes a brief white flash. This narrow accessible-name selector is inert on pages without Gmail's
+     search field, so the rule can be installed before the mail application finishes mounting its controls. */
+  function updateSiteCompatibilityStyles(enabled) {
+    const existing = document.getElementById(SITE_COMPAT_STYLE_ID);
+    if (!enabled) {
+      if (existing) existing.remove();
+      return;
+    }
+    if (existing) return;
+    const style = document.createElement('style');
+    style.id = SITE_COMPAT_STYLE_ID;
+    style.textContent = 'input[aria-label="Search mail"] { transition: none !important; }';
+    (document.head || document.documentElement).appendChild(style);
+  }
+
   const INLINE_BG_COLOR = 'var(--darkreader-inline-bgcolor)';
   const inlineBackgroundOverrides = new Map();
   let inlineBackgroundObserver = null;
@@ -189,6 +207,7 @@
 
   function applyTheme(on) {
     if (!window.DarkReader) return;
+    updateSiteCompatibilityStyles(on);
     const fixes = fixesFor(state.factoryDark);
     const invert = invertSelectors();
     const key = `${state.factoryDark}|${invert.join('|')}`;
@@ -304,8 +323,8 @@
     if (!node) return false;
     const element = node.nodeType === Node.ELEMENT_NODE ? node : node.parentElement;
     if (!element) return false;
-    const style = element.closest && element.closest('style.darkreader, #smart-dark-images');
-    return !!style || !!(element.matches && element.matches('style.darkreader, #smart-dark-images'));
+    const style = element.closest && element.closest('style.darkreader, #smart-dark-images, #smart-dark-site-compatibility');
+    return !!style || !!(element.matches && element.matches('style.darkreader, #smart-dark-images, #smart-dark-site-compatibility'));
   }
 
   function detect() {

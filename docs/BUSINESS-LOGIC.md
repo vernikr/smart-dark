@@ -114,6 +114,14 @@ on input with aria-label equal to Search mail. Gmail animates the search field b
 changing the page theme during that transition can expose a brief light frame. The rule affects only the Gmail search
 control and is removed when the site layer is disabled.
 
+**Embedded Dark Reader resource loading.** Before activating Dark Reader, Smart Dark installs a fetch adapter that
+uses the extension service worker rather than page-origin fetch. The service worker fetches cross-origin stylesheets,
+images and fonts with credentials omitted under the extension's host permissions, enforces a streaming 16 MiB response
+limit, and returns a normal Response to the embedded runtime. This avoids the embedded runtime's default CORS rejection
+and keeps site cookies out of public resource requests. The original runtime messaging method is captured before Dark
+Reader wraps it, so this bridge does not recurse through the embedded message shim. Some strict site CSP policies still
+block Dark Reader's optional inline CSSOM proxy; its stylesheet watcher falls back to polling while theme styles remain active.
+
 **Inline-important backgrounds.** Dark Reader can mark an element with data-darkreader-inline-bgcolor while its
 stylesheet conversion still loses to the page's inline background or background-color declaration with important.
 For those marked elements only, the extension temporarily applies Dark Reader's resolved computed background as inline

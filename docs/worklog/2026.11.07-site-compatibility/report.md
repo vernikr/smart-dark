@@ -1,7 +1,7 @@
 # Site compatibility follow-up
 
 Issue: https://github.com/vernikr/smart-dark/issues/4
-Base: PR #3 (fix/2-observation-image-lifecycle)
+Base: main (PR #3 was merged before this follow-up)
 
 ## Findings
 
@@ -11,26 +11,22 @@ Base: PR #3 (fix/2-observation-image-lifecycle)
 - Mobilism's forum rows use phpBB-style class names such as darkrow1/darkrow2; these names must not be interpreted as a page-level dark declaration.
 - Gmail's shell and message can be represented with a focused search input and a message table whose inline background declarations include important. The shared Dark Reader runtime recolours the mail banner when the inline-important background adapter is active.
 
-## Change
+## Changes
 
-While the site layer is enabled, install a narrowly targeted CSS rule for Gmail's accessible search field to disable its background transition. This prevents a light intermediate frame when the user enables darkening while the search field is focused. The rule is removed when the site layer is disabled.
-
-The remaining reported page families use the shared Dark Reader 4.9.134 path and the general theme/typography fixes from PR #3; no stale per-site invert selectors or broad host-specific background overrides are added.
+- While the site layer is enabled, install a narrowly targeted CSS rule for Gmail's accessible search field to disable its background transition. This prevents a light intermediate frame when the user enables darkening while the search field is focused. The rule is removed when the site layer is disabled.
+- Replace the embedded Dark Reader's default cross-origin rejection with a service-worker fetch bridge. The original extension messaging method is captured before Dark Reader wraps it; the service worker fetches public resources with credentials omitted, enforces a streaming 16 MiB response limit, and returns the bytes as a normal Response to Dark Reader.
+- No legacy npm selectors or broad host-specific background overrides were added: the shared Dark Reader runtime handles the representative site surfaces in the local test matrix.
 
 ## Verification
 
-The local compatibility fixtures cover phpBB/Mobilism row classes, Google Devsite typography, OpenAI Help article surfaces, npm settings header/cards, and Gmail focused search plus inline-important email banner. Screenshots and machine-readable results are stored in shots.
-
-Live tabs were read through the connected browser context. Computed live-page styles could not be queried by the read-only browser connector; after the PRs are merged and the extension is reloaded, the five original pages still require a final visual check.
-
-## Final verification
+The local compatibility fixtures cover phpBB/Mobilism row classes, Google Devsite typography, OpenAI Help article surfaces, npm settings header/cards, and Gmail focused search plus inline-important email banner. The service-worker bridge has direct tests for cross-origin image retrieval, cookie omission, and the streaming size limit. Screenshots and machine-readable results are stored in shots.
 
 - npm run build — passed.
-- npm test — 92/92 checks passed, 0 skipped.
-- node --check — passed for content.js and test.mjs.
+- npm test — 95/95 checks passed, 0 skipped.
+- The live Kiro page used the new service-worker bridge for one cross-origin resource request; no fetch failures were recorded.
+- node --check — passed for all changed JavaScript files.
 - git diff --check — passed.
 
-The browser context confirmed the npm page's light-mode control and the Google Devsite light-scheme class. The Gmail message and search control were visible in the open tab. The connected browser interface is read-only and does not expose computed live-page CSS; the visual checks on the five original pages therefore remain a post-merge/reload step. No changes to the upstream site-fix snapshot were made: the local fixtures show that Dark Reader 4.9.134 already recolours the representative npm, Notebook, OpenAI Help and Gmail surfaces.
+The local live-site smoke test was run in an isolated Chromium profile. Notebook and Meduza received the dark theme. npm and Mobilism were shown Cloudflare verification pages; OpenAI Help also served a verification shell; the unsigned Gmail session redirected to Google sign-in. These four pages could not be evaluated in their authenticated/live state by this isolated profile. The main Chrome visual pass was obstructed by a macOS screen-recording permission dialog; its screenshots were therefore not used as authoritative visual evidence.
 
-The final local run completed with 92/92 checks passing and no skips. It includes the new Gmail focus-state regression,
-all five site-family fixtures, and the previous shared lifecycle, image, theme detection, YouTube and live Kiro checks.
+Chrome's extension error view showed Dark Reader's optional inline proxy being blocked by strict script-src CSP on at least one page. Its stylesheet watcher falls back to polling while theme styles remain active. Automatic detection of this browser-generated violation was not reliable from the isolated content-script context, so no global proxy-disable workaround was added.

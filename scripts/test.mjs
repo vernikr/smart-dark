@@ -26,9 +26,10 @@ const skip = (name, detail = '') => {
 };
 
 
-const TYPES = { '.html': 'text/html', '.png': 'image/png', '.jpg': 'image/jpeg', '.svg': 'image/svg+xml' };
+const TYPES = { '.html': 'text/html', '.css': 'text/css', '.png': 'image/png', '.jpg': 'image/jpeg', '.svg': 'image/svg+xml' };
 
 let corsPort = 0;
+let lastCdnRequest = null;
 
 function serve() {
   const server = http.createServer((req, res) => {
@@ -56,15 +57,32 @@ function serve() {
    carries cookies is rejected by the browser against such a header, so this server is what catches that mistake. */
 function serveCdn() {
   const server = http.createServer((req, res) => {
-    const file = path.join(fixtures, 'images', path.basename(decodeURIComponent(req.url.split('?')[0])));
-    if (!file.startsWith(fixtures) || !fs.existsSync(file)) {
+    const name = path.basename(decodeURIComponent(req.url.split('?')[0]));
+    lastCdnRequest = { url: req.url, cookie: req.headers.cookie || null };
+    if (name === 'large.bin') {
+      res.writeHead(200, {
+        'content-type': 'application/octet-stream',
+        'access-control-allow-origin': '*',
+      });
+      const block = Buffer.alloc(8 * 1024 * 1024);
+      res.write(block);
+      res.write(block);
+      res.end(Buffer.from([0]));
+      return;
+    }
+    const file = path.join(fixtures, 'images', name);
+    if (!file) {
       res.writeHead(404).end('not found');
       return;
+    }
+    let body = fs.readFileSync(file);
+    if (file.endsWith('.css') && body.includes('__CORS__')) {
+      body = Buffer.from(body.toString('utf8').replaceAll('__CORS__', String(corsPort)));
     }
     res.writeHead(200, {
       'content-type': TYPES[path.extname(file)] || 'application/octet-stream',
       'access-control-allow-origin': '*',
-    }).end(fs.readFileSync(file));
+    }).end(body);
   });
   return new Promise((resolve) => server.listen(0, '127.0.0.1', () => {
     corsPort = server.address().port;
@@ -343,6 +361,40 @@ async function main() {
     await page.close();
   }
 
+  // 1c. The service-worker fetch bridge is exercised directly from the extension origin.
+  const bridgeSite = await context.newPage();
+  await bridgeSite.goto(base + '/light/', { waitUntil: 'load' });
+  await bridgeSite.evaluate(() => { document.cookie = 'smart-dark-bridge-test=present; SameSite=Lax'; });
+  const bridgeCookie = await bridgeSite.evaluate(() => document.cookie);
+  const bridgePage = await context.newPage();
+  await bridgePage.goto('chrome-extension://' + extId + '/popup.html', { waitUntil: 'load' });
+  const cdnURL = 'http://127.0.0.1:' + cdn.address().port;
+  lastCdnRequest = null;
+  const bridgeImage = await bridgePage.evaluate(async (url) => {
+    return await chrome.runtime.sendMessage({ type: 'wd-fetch-resource', url });
+  }, cdnURL + '/photo.jpg');
+  const imageRequest = lastCdnRequest;
+  const bridgeBytes = Buffer.from(bridgeImage && bridgeImage.body || '', 'base64').byteLength;
+  check('resource bridge: extension worker returns a cross-origin image as a data payload',
+    !!bridgeImage && bridgeImage.ok === true && bridgeImage.contentType === 'image/jpeg' && bridgeBytes > 1000,
+    JSON.stringify({ ok: bridgeImage && bridgeImage.ok, contentType: bridgeImage && bridgeImage.contentType, bytes: bridgeBytes }));
+  check('resource bridge: site cookies are omitted from cross-origin requests',
+    bridgeCookie.includes('smart-dark-bridge-test=present') && !!imageRequest && imageRequest.cookie === null,
+    JSON.stringify({ pageCookiePresent: bridgeCookie.includes('smart-dark-bridge-test=present'), requestCookie: imageRequest && imageRequest.cookie }));
+
+  lastCdnRequest = null;
+  const oversizedResource = await bridgePage.evaluate(async (url) => {
+    return await chrome.runtime.sendMessage({ type: 'wd-fetch-resource', url });
+  }, cdnURL + '/large.bin');
+  check('resource bridge: oversized response is cancelled at the streaming 16 MiB limit',
+    !!oversizedResource && oversizedResource.ok === false
+      && /16 MiB/.test(oversizedResource.error || '')
+      && !!lastCdnRequest && lastCdnRequest.url === '/large.bin',
+    JSON.stringify({ result: oversizedResource, request: lastCdnRequest }));
+  await bridgePage.close();
+  await bridgeSite.close();
+
+  // 2. live site with its own dark theme
   // 2. live site with its own dark theme
   await setStorage({ darkSites: {}, imageSites: {} });
   const kiro = await context.newPage();
@@ -351,9 +403,19 @@ async function main() {
     const info = await waitFor(kiro, () => (document.documentElement.dataset.sdState ? JSON.parse(document.documentElement.dataset.sdState) : null));
     check('live: native dark blog detected', info && info.factoryDark === true, JSON.stringify(info));
     check('live: theme stays off on native dark blog', info && info.dark === false);
+    const fetchInfo = await waitFor(kiro, () => {
+      const raw = document.documentElement.dataset.sdState;
+      if (!raw) return null;
+      const current = JSON.parse(raw);
+      return current.darkReaderFetchRequests > 0 || current.darkReaderFetchFailures > 0 ? current : null;
+    }, 10000);
+    check('live: cross-origin site resources use the extension fetch bridge',
+      !!fetchInfo && fetchInfo.darkReaderFetchRequests > 0 && fetchInfo.darkReaderFetchFailures === 0,
+      JSON.stringify(fetchInfo));
   } else {
     skip('live: native dark blog detected', 'site unreachable from the sandbox');
     skip('live: theme stays off on native dark blog', 'site unreachable from the sandbox');
+    skip('live: cross-origin site resources use the extension fetch bridge', 'site unreachable from the sandbox');
   }
 
   // 2b. a light page reached through a challenge screen must not be read as dark

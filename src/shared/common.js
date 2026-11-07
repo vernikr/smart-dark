@@ -4,6 +4,8 @@
 
   const DEFAULTS = { darkSites: {}, imageSites: {} };
   const API = typeof browser !== 'undefined' ? browser : chrome;
+  // Keep the original API method before Dark Reader wraps runtime messaging for its embedded mode.
+  const nativeSendMessage = API.runtime.sendMessage.bind(API.runtime);
   const FRAME_ID = Math.random().toString(36).slice(2) + Date.now().toString(36);
 
   function getSettings() {
@@ -38,5 +40,5 @@
     return typeof value === 'boolean' ? value : null;
   }
 
-  window.WD = { DEFAULTS, API, FRAME_ID, getSettings, setSettings, domainKey, isDarkSite, imagesEnabled, darkChoice };
+  window.WD = { DEFAULTS, API, FRAME_ID, nativeSendMessage, getSettings, setSettings, domainKey, isDarkSite, imagesEnabled, darkChoice };
 })();

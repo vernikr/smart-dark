@@ -2,7 +2,7 @@
   {
     "name": "detection: light page",
     "ok": true,
-    "detail": "{\"factoryDark\":false,\"detected\":true,\"dark\":true,\"reason\":\"measured-light\",\"imageError\":null,\"video\":false,\"invertCount\":0,\"styleKey\":\"false|\",\"reviewCount\":2}"
+    "detail": "{\"factoryDark\":false,\"detected\":true,\"dark\":true,\"reason\":\"measured-light\",\"imageError\":null,\"video\":false,\"invertCount\":0,\"styleKey\":\"false|\",\"reviewCount\":2,\"darkReaderFetch\":true,\"darkReaderFetchRequests\":0,\"darkReaderFetchFailures\":0}"
   },
   {
     "name": "detection: light page gets the theme without manual action",
@@ -17,67 +17,67 @@
   {
     "name": "detection: short contentful page",
     "ok": true,
-    "detail": "{\"factoryDark\":false,\"detected\":true,\"dark\":true,\"reason\":\"measured-light\",\"imageError\":null,\"video\":false,\"invertCount\":0,\"styleKey\":\"false|\",\"reviewCount\":2}"
+    "detail": "{\"factoryDark\":false,\"detected\":true,\"dark\":true,\"reason\":\"measured-light\",\"imageError\":null,\"video\":false,\"invertCount\":0,\"styleKey\":\"false|\",\"reviewCount\":2,\"darkReaderFetch\":true,\"darkReaderFetchRequests\":0,\"darkReaderFetchFailures\":0}"
   },
   {
     "name": "detection: compact content is measured and themed",
     "ok": true,
-    "detail": "{\"height\":19,\"state\":{\"factoryDark\":false,\"detected\":true,\"dark\":true,\"reason\":\"measured-light\",\"imageError\":null,\"video\":false,\"invertCount\":0,\"styleKey\":\"false|\",\"reviewCount\":2}}"
+    "detail": "{\"height\":19,\"state\":{\"factoryDark\":false,\"detected\":true,\"dark\":true,\"reason\":\"measured-light\",\"imageError\":null,\"video\":false,\"invertCount\":0,\"styleKey\":\"false|\",\"reviewCount\":2,\"darkReaderFetch\":true,\"darkReaderFetchRequests\":0,\"darkReaderFetchFailures\":0}}"
   },
   {
     "name": "detection: empty generic mode attributes do not claim a dark theme",
     "ok": true,
-    "detail": "{\"factoryDark\":false,\"detected\":true,\"dark\":true,\"reason\":\"measured-light\",\"imageError\":null,\"video\":false,\"invertCount\":0,\"styleKey\":\"false|\",\"reviewCount\":2}"
+    "detail": "{\"factoryDark\":false,\"detected\":true,\"dark\":true,\"reason\":\"measured-light\",\"imageError\":null,\"video\":false,\"invertCount\":0,\"styleKey\":\"false|\",\"reviewCount\":2,\"darkReaderFetch\":true,\"darkReaderFetchRequests\":0,\"darkReaderFetchFailures\":0}"
   },
   {
     "name": "detection: color-scheme dark alone does not imply dark painted surfaces",
     "ok": true,
-    "detail": "{\"factoryDark\":false,\"detected\":true,\"dark\":true,\"reason\":\"measured-light\",\"imageError\":null,\"video\":false,\"invertCount\":0,\"styleKey\":\"false|\",\"reviewCount\":2}"
+    "detail": "{\"factoryDark\":false,\"detected\":true,\"dark\":true,\"reason\":\"measured-light\",\"imageError\":null,\"video\":false,\"invertCount\":0,\"styleKey\":\"false|\",\"reviewCount\":2,\"darkReaderFetch\":true,\"darkReaderFetchRequests\":0,\"darkReaderFetchFailures\":0}"
   },
   {
     "name": "detection: an explicit data-mode dark value remains recognised",
     "ok": true,
-    "detail": "{\"factoryDark\":true,\"detected\":true,\"dark\":false,\"reason\":\"declared-dark\",\"imageError\":null,\"video\":false,\"invertCount\":0,\"styleKey\":\"true|\",\"reviewCount\":2}"
+    "detail": "{\"factoryDark\":true,\"detected\":true,\"dark\":false,\"reason\":\"declared-dark\",\"imageError\":null,\"video\":false,\"invertCount\":0,\"styleKey\":\"true|\",\"reviewCount\":2,\"darkReaderFetch\":false,\"darkReaderFetchRequests\":0,\"darkReaderFetchFailures\":0}"
   },
   {
     "name": "detection: an explicit data-color-mode light value remains recognised",
     "ok": true,
-    "detail": "{\"factoryDark\":false,\"detected\":true,\"dark\":true,\"reason\":\"declared-light\",\"imageError\":null,\"video\":false,\"invertCount\":0,\"styleKey\":\"false|\",\"reviewCount\":2}"
+    "detail": "{\"factoryDark\":false,\"detected\":true,\"dark\":true,\"reason\":\"declared-light\",\"imageError\":null,\"video\":false,\"invertCount\":0,\"styleKey\":\"false|\",\"reviewCount\":2,\"darkReaderFetch\":true,\"darkReaderFetchRequests\":0,\"darkReaderFetchFailures\":0}"
   },
   {
     "name": "detection: phpBB darkrow classes do not declare a dark site",
     "ok": true,
-    "detail": "{\"factoryDark\":false,\"detected\":true,\"dark\":true,\"reason\":\"measured-light\",\"imageError\":null,\"video\":false,\"invertCount\":0,\"styleKey\":\"false|\",\"reviewCount\":2}"
+    "detail": "{\"factoryDark\":false,\"detected\":true,\"dark\":true,\"reason\":\"measured-light\",\"imageError\":null,\"video\":false,\"invertCount\":0,\"styleKey\":\"false|\",\"reviewCount\":2,\"darkReaderFetch\":true,\"darkReaderFetchRequests\":0,\"darkReaderFetchFailures\":0}"
   },
   {
     "name": "detection: Google Devsite class color-scheme--light remains a light site",
     "ok": true,
-    "detail": "{\"factoryDark\":false,\"detected\":true,\"dark\":true,\"reason\":\"declared-light\",\"imageError\":null,\"video\":false,\"invertCount\":0,\"styleKey\":\"false|\",\"reviewCount\":2}"
+    "detail": "{\"factoryDark\":false,\"detected\":true,\"dark\":true,\"reason\":\"declared-light\",\"imageError\":null,\"video\":false,\"invertCount\":0,\"styleKey\":\"false|\",\"reviewCount\":2,\"darkReaderFetch\":true,\"darkReaderFetchRequests\":0,\"darkReaderFetchFailures\":0}"
   },
   {
     "name": "detection: OpenAI Help Center article is measured as light",
     "ok": true,
-    "detail": "{\"factoryDark\":false,\"detected\":true,\"dark\":true,\"reason\":\"measured-light\",\"imageError\":null,\"video\":false,\"invertCount\":0,\"styleKey\":\"false|\",\"reviewCount\":2}"
+    "detail": "{\"factoryDark\":false,\"detected\":true,\"dark\":true,\"reason\":\"measured-light\",\"imageError\":null,\"video\":false,\"invertCount\":0,\"styleKey\":\"false|\",\"reviewCount\":2,\"darkReaderFetch\":true,\"darkReaderFetchRequests\":0,\"darkReaderFetchFailures\":0}"
   },
   {
     "name": "detection: npm package settings page is measured as light",
     "ok": true,
-    "detail": "{\"factoryDark\":false,\"detected\":true,\"dark\":true,\"reason\":\"measured-light\",\"imageError\":null,\"video\":false,\"invertCount\":0,\"styleKey\":\"false|\",\"reviewCount\":2}"
+    "detail": "{\"factoryDark\":false,\"detected\":true,\"dark\":true,\"reason\":\"measured-light\",\"imageError\":null,\"video\":false,\"invertCount\":0,\"styleKey\":\"false|\",\"reviewCount\":2,\"darkReaderFetch\":true,\"darkReaderFetchRequests\":0,\"darkReaderFetchFailures\":0}"
   },
   {
     "name": "detection: Gmail-like mailbox shell is measured as light",
     "ok": true,
-    "detail": "{\"factoryDark\":false,\"detected\":true,\"dark\":true,\"reason\":\"measured-light\",\"imageError\":null,\"video\":false,\"invertCount\":0,\"styleKey\":\"false|\",\"reviewCount\":2}"
+    "detail": "{\"factoryDark\":false,\"detected\":true,\"dark\":true,\"reason\":\"measured-light\",\"imageError\":null,\"video\":false,\"invertCount\":0,\"styleKey\":\"false|\",\"reviewCount\":2,\"darkReaderFetch\":true,\"darkReaderFetchRequests\":0,\"darkReaderFetchFailures\":0}"
   },
   {
     "name": "detection: email card with important inline background",
     "ok": true,
-    "detail": "{\"factoryDark\":false,\"detected\":true,\"dark\":true,\"reason\":\"measured-light\",\"imageError\":null,\"video\":false,\"invertCount\":0,\"styleKey\":\"false|\",\"reviewCount\":3}"
+    "detail": "{\"factoryDark\":false,\"detected\":true,\"dark\":true,\"reason\":\"measured-light\",\"imageError\":null,\"video\":false,\"invertCount\":0,\"styleKey\":\"false|\",\"reviewCount\":3,\"darkReaderFetch\":true,\"darkReaderFetchRequests\":0,\"darkReaderFetchFailures\":0}"
   },
   {
     "name": "inline-important: message background is darkened",
     "ok": true,
-    "detail": "{\"background\":\"rgb(24, 26, 27)\",\"priority\":\"important\",\"color\":\"rgb(200, 195, 188)\",\"state\":{\"factoryDark\":false,\"detected\":true,\"dark\":true,\"reason\":\"measured-light\",\"imageError\":null,\"video\":false,\"invertCount\":0,\"styleKey\":\"false|\",\"reviewCount\":3}}"
+    "detail": "{\"background\":\"rgb(24, 26, 27)\",\"priority\":\"important\",\"color\":\"rgb(200, 195, 188)\",\"state\":{\"factoryDark\":false,\"detected\":true,\"dark\":true,\"reason\":\"measured-light\",\"imageError\":null,\"video\":false,\"invertCount\":0,\"styleKey\":\"false|\",\"reviewCount\":3,\"darkReaderFetch\":true,\"darkReaderFetchRequests\":0,\"darkReaderFetchFailures\":0}}"
   },
   {
     "name": "inline-important: original inline style is restored when the theme is off",
@@ -92,27 +92,27 @@
   {
     "name": "detection: data-theme dark page",
     "ok": true,
-    "detail": "{\"factoryDark\":true,\"detected\":true,\"dark\":false,\"reason\":\"declared-dark\",\"imageError\":null,\"video\":false,\"invertCount\":0,\"styleKey\":\"true|\",\"reviewCount\":2}"
+    "detail": "{\"factoryDark\":true,\"detected\":true,\"dark\":false,\"reason\":\"declared-dark\",\"imageError\":null,\"video\":false,\"invertCount\":0,\"styleKey\":\"true|\",\"reviewCount\":2,\"darkReaderFetch\":false,\"darkReaderFetchRequests\":0,\"darkReaderFetchFailures\":0}"
   },
   {
     "name": "detection: body.dark page",
     "ok": true,
-    "detail": "{\"factoryDark\":true,\"detected\":true,\"dark\":false,\"reason\":\"declared-dark\",\"imageError\":null,\"video\":false,\"invertCount\":0,\"styleKey\":\"true|\",\"reviewCount\":2}"
+    "detail": "{\"factoryDark\":true,\"detected\":true,\"dark\":false,\"reason\":\"declared-dark\",\"imageError\":null,\"video\":false,\"invertCount\":0,\"styleKey\":\"true|\",\"reviewCount\":2,\"darkReaderFetch\":false,\"darkReaderFetchRequests\":0,\"darkReaderFetchFailures\":0}"
   },
   {
     "name": "detection: page whose dark canvas is painted by gradients",
     "ok": true,
-    "detail": "{\"factoryDark\":true,\"detected\":true,\"dark\":false,\"reason\":\"measured-dark\",\"imageError\":null,\"video\":false,\"invertCount\":0,\"styleKey\":\"true|\",\"reviewCount\":2}"
+    "detail": "{\"factoryDark\":true,\"detected\":true,\"dark\":false,\"reason\":\"measured-dark\",\"imageError\":null,\"video\":false,\"invertCount\":0,\"styleKey\":\"true|\",\"reviewCount\":2,\"darkReaderFetch\":false,\"darkReaderFetchRequests\":0,\"darkReaderFetchFailures\":0}"
   },
   {
     "name": "detection: page with a dark hero only",
     "ok": true,
-    "detail": "{\"factoryDark\":false,\"detected\":true,\"dark\":true,\"reason\":\"measured-light\",\"imageError\":null,\"video\":false,\"invertCount\":0,\"styleKey\":\"false|\",\"reviewCount\":2}"
+    "detail": "{\"factoryDark\":false,\"detected\":true,\"dark\":true,\"reason\":\"measured-light\",\"imageError\":null,\"video\":false,\"invertCount\":0,\"styleKey\":\"false|\",\"reviewCount\":2,\"darkReaderFetch\":true,\"darkReaderFetchRequests\":0,\"darkReaderFetchFailures\":0}"
   },
   {
     "name": "compatibility: Mobilism/phpBB accepts the explicit dark switch",
     "ok": true,
-    "detail": "{\"factoryDark\":false,\"detected\":true,\"dark\":true,\"reason\":\"measured-light\",\"imageError\":null,\"video\":false,\"invertCount\":0,\"styleKey\":\"false|\",\"reviewCount\":2}"
+    "detail": "{\"factoryDark\":false,\"detected\":true,\"dark\":true,\"reason\":\"measured-light\",\"imageError\":null,\"video\":false,\"invertCount\":0,\"styleKey\":\"false|\",\"reviewCount\":2,\"darkReaderFetch\":true,\"darkReaderFetchRequests\":0,\"darkReaderFetchFailures\":0}"
   },
   {
     "name": "compatibility: Mobilism-style forum has a dark body and legible forum rows",
@@ -122,7 +122,7 @@
   {
     "name": "compatibility: Google Notebook docs accepts the explicit dark switch",
     "ok": true,
-    "detail": "{\"factoryDark\":false,\"detected\":true,\"dark\":true,\"reason\":\"declared-light\",\"imageError\":null,\"video\":false,\"invertCount\":0,\"styleKey\":\"false|\",\"reviewCount\":2}"
+    "detail": "{\"factoryDark\":false,\"detected\":true,\"dark\":true,\"reason\":\"declared-light\",\"imageError\":null,\"video\":false,\"invertCount\":0,\"styleKey\":\"false|\",\"reviewCount\":2,\"darkReaderFetch\":true,\"darkReaderFetchRequests\":0,\"darkReaderFetchFailures\":0}"
   },
   {
     "name": "compatibility: Notebook docs darken while retaining Google font declarations",
@@ -132,7 +132,7 @@
   {
     "name": "compatibility: OpenAI Help accepts the explicit dark switch",
     "ok": true,
-    "detail": "{\"factoryDark\":false,\"detected\":true,\"dark\":true,\"reason\":\"measured-light\",\"imageError\":null,\"video\":false,\"invertCount\":0,\"styleKey\":\"false|\",\"reviewCount\":2}"
+    "detail": "{\"factoryDark\":false,\"detected\":true,\"dark\":true,\"reason\":\"measured-light\",\"imageError\":null,\"video\":false,\"invertCount\":0,\"styleKey\":\"false|\",\"reviewCount\":2,\"darkReaderFetch\":true,\"darkReaderFetchRequests\":0,\"darkReaderFetchFailures\":0}"
   },
   {
     "name": "compatibility: OpenAI Help article surfaces are darkened",
@@ -142,7 +142,7 @@
   {
     "name": "compatibility: npm package settings accepts the explicit dark switch",
     "ok": true,
-    "detail": "{\"factoryDark\":false,\"detected\":true,\"dark\":true,\"reason\":\"measured-light\",\"imageError\":null,\"video\":false,\"invertCount\":0,\"styleKey\":\"false|\",\"reviewCount\":2}"
+    "detail": "{\"factoryDark\":false,\"detected\":true,\"dark\":true,\"reason\":\"measured-light\",\"imageError\":null,\"video\":false,\"invertCount\":0,\"styleKey\":\"false|\",\"reviewCount\":2,\"darkReaderFetch\":true,\"darkReaderFetchRequests\":0,\"darkReaderFetchFailures\":0}"
   },
   {
     "name": "compatibility: npm header and package list are consistently dark",
@@ -157,22 +157,22 @@
   {
     "name": "compatibility: Gmail message accepts the explicit dark switch",
     "ok": true,
-    "detail": "{\"factoryDark\":false,\"detected\":true,\"dark\":true,\"reason\":\"measured-light\",\"imageError\":null,\"video\":false,\"invertCount\":0,\"styleKey\":\"false|\",\"reviewCount\":2}"
+    "detail": "{\"factoryDark\":false,\"detected\":true,\"dark\":true,\"reason\":\"measured-light\",\"imageError\":null,\"video\":false,\"invertCount\":0,\"styleKey\":\"false|\",\"reviewCount\":2,\"darkReaderFetch\":true,\"darkReaderFetchRequests\":0,\"darkReaderFetchFailures\":0}"
   },
   {
     "name": "compatibility: Gmail search keeps focus through theme activation",
     "ok": true,
-    "detail": "{\"before\":{\"active\":true,\"transition\":\"0.18s, 0.18s\"},\"after\":{\"active\":true,\"background\":\"rgb(24, 26, 27)\",\"color\":\"rgb(211, 207, 201)\",\"transition\":\"0s\",\"state\":{\"factoryDark\":false,\"detected\":true,\"dark\":true,\"reason\":\"measured-light\",\"imageError\":null,\"video\":false,\"invertCount\":0,\"styleKey\":\"false|\",\"reviewCount\":4}}}"
+    "detail": "{\"before\":{\"active\":true,\"transition\":\"0.18s, 0.18s\"},\"after\":{\"active\":true,\"background\":\"rgb(24, 26, 27)\",\"color\":\"rgb(211, 207, 201)\",\"transition\":\"0s\",\"state\":{\"factoryDark\":false,\"detected\":true,\"dark\":true,\"reason\":\"measured-light\",\"imageError\":null,\"video\":false,\"invertCount\":0,\"styleKey\":\"false|\",\"reviewCount\":4,\"darkReaderFetch\":true,\"darkReaderFetchRequests\":0,\"darkReaderFetchFailures\":0}}}"
   },
   {
     "name": "compatibility: Gmail focused search transition is disabled while dark mode is active",
     "ok": true,
-    "detail": "{\"active\":true,\"background\":\"rgb(24, 26, 27)\",\"color\":\"rgb(211, 207, 201)\",\"transition\":\"0s\",\"state\":{\"factoryDark\":false,\"detected\":true,\"dark\":true,\"reason\":\"measured-light\",\"imageError\":null,\"video\":false,\"invertCount\":0,\"styleKey\":\"false|\",\"reviewCount\":4}}"
+    "detail": "{\"active\":true,\"background\":\"rgb(24, 26, 27)\",\"color\":\"rgb(211, 207, 201)\",\"transition\":\"0s\",\"state\":{\"factoryDark\":false,\"detected\":true,\"dark\":true,\"reason\":\"measured-light\",\"imageError\":null,\"video\":false,\"invertCount\":0,\"styleKey\":\"false|\",\"reviewCount\":4,\"darkReaderFetch\":true,\"darkReaderFetchRequests\":0,\"darkReaderFetchFailures\":0}}"
   },
   {
     "name": "compatibility: Gmail focused search field stays dark and readable",
     "ok": true,
-    "detail": "{\"active\":true,\"background\":\"rgb(24, 26, 27)\",\"color\":\"rgb(211, 207, 201)\",\"transition\":\"0s\",\"state\":{\"factoryDark\":false,\"detected\":true,\"dark\":true,\"reason\":\"measured-light\",\"imageError\":null,\"video\":false,\"invertCount\":0,\"styleKey\":\"false|\",\"reviewCount\":4}}"
+    "detail": "{\"active\":true,\"background\":\"rgb(24, 26, 27)\",\"color\":\"rgb(211, 207, 201)\",\"transition\":\"0s\",\"state\":{\"factoryDark\":false,\"detected\":true,\"dark\":true,\"reason\":\"measured-light\",\"imageError\":null,\"video\":false,\"invertCount\":0,\"styleKey\":\"false|\",\"reviewCount\":4,\"darkReaderFetch\":true,\"darkReaderFetchRequests\":0,\"darkReaderFetchFailures\":0}}"
   },
   {
     "name": "compatibility: Gmail email banner background and text stay contrasted",
@@ -185,9 +185,24 @@
     "detail": "0.18s, 0.18s"
   },
   {
+    "name": "resource bridge: extension worker returns a cross-origin image as a data payload",
+    "ok": true,
+    "detail": "{\"ok\":true,\"contentType\":\"image/jpeg\",\"bytes\":163707}"
+  },
+  {
+    "name": "resource bridge: site cookies are omitted from cross-origin requests",
+    "ok": true,
+    "detail": "{\"pageCookiePresent\":true,\"requestCookie\":null}"
+  },
+  {
+    "name": "resource bridge: oversized response is cancelled at the streaming 16 MiB limit",
+    "ok": true,
+    "detail": "{\"result\":{\"ok\":false,\"error\":\"Resource exceeds the 16 MiB fetch limit\"},\"request\":{\"url\":\"/large.bin\",\"cookie\":null}}"
+  },
+  {
     "name": "live: native dark blog detected",
     "ok": true,
-    "detail": "{\"factoryDark\":true,\"detected\":true,\"dark\":false,\"reason\":\"declared-dark\",\"imageError\":null,\"video\":false,\"invertCount\":0,\"styleKey\":\"true|\",\"reviewCount\":2}"
+    "detail": "{\"factoryDark\":true,\"detected\":true,\"dark\":false,\"reason\":\"declared-dark\",\"imageError\":null,\"video\":false,\"invertCount\":0,\"styleKey\":\"true|\",\"reviewCount\":2,\"darkReaderFetch\":true,\"darkReaderFetchRequests\":1,\"darkReaderFetchFailures\":0}"
   },
   {
     "name": "live: theme stays off on native dark blog",
@@ -195,14 +210,14 @@
     "detail": ""
   },
   {
-    "name": "arena.ai: light challenge page is not mistaken for a dark theme",
+    "name": "live: cross-origin site resources use the extension fetch bridge",
     "ok": true,
-    "detail": "{\"factoryDark\":false,\"detected\":true,\"dark\":true,\"reason\":\"measured-light\",\"imageError\":null,\"video\":false,\"invertCount\":0,\"styleKey\":\"false|\",\"reviewCount\":2}"
+    "detail": "{\"factoryDark\":true,\"detected\":true,\"dark\":false,\"reason\":\"declared-dark\",\"imageError\":null,\"video\":false,\"invertCount\":0,\"styleKey\":\"true|\",\"reviewCount\":2,\"darkReaderFetch\":true,\"darkReaderFetchRequests\":1,\"darkReaderFetchFailures\":0}"
   },
   {
     "name": "live: article diagrams converted on a native dark site",
     "ok": true,
-    "detail": "{\"started\":18,\"converted\":4,\"reasons\":{\"small\":6,\"unprocessed\":7,\"not-visible\":1}}"
+    "detail": "{\"started\":14,\"converted\":4,\"reasons\":{\"small\":5,\"unprocessed\":4,\"not-visible\":1}}"
   },
   {
     "name": "live: no image left in a failed state",
@@ -217,12 +232,12 @@
   {
     "name": "youtube: the dark theme announced on <html> is picked up",
     "ok": true,
-    "detail": "{\"factoryDark\":true,\"detected\":true,\"dark\":false,\"reason\":\"declared-dark\",\"imageError\":null,\"video\":true,\"invertCount\":0,\"styleKey\":\"true|\",\"reviewCount\":2}"
+    "detail": "{\"factoryDark\":true,\"detected\":true,\"dark\":false,\"reason\":\"declared-dark\",\"imageError\":null,\"video\":true,\"invertCount\":0,\"styleKey\":\"true|\",\"reviewCount\":2,\"darkReaderFetch\":false,\"darkReaderFetchRequests\":0,\"darkReaderFetchFailures\":0}"
   },
   {
     "name": "youtube: no layer of our theme is painted over the page",
     "ok": true,
-    "detail": "{\"factoryDark\":true,\"detected\":true,\"dark\":false,\"reason\":\"declared-dark\",\"imageError\":null,\"video\":true,\"invertCount\":0,\"styleKey\":\"true|\",\"reviewCount\":2}"
+    "detail": "{\"factoryDark\":true,\"detected\":true,\"dark\":false,\"reason\":\"declared-dark\",\"imageError\":null,\"video\":true,\"invertCount\":0,\"styleKey\":\"true|\",\"reviewCount\":2,\"darkReaderFetch\":false,\"darkReaderFetchRequests\":0,\"darkReaderFetchFailures\":0}"
   },
   {
     "name": "youtube: the clip is never inverted",
@@ -237,17 +252,17 @@
   {
     "name": "late theme: a shell that is light before its theme arrives is not judged light",
     "ok": true,
-    "detail": "{\"early\":{\"factoryDark\":false,\"detected\":true,\"dark\":true,\"reason\":\"measured-light\",\"imageError\":null,\"video\":false,\"invertCount\":0,\"styleKey\":\"false|\",\"reviewCount\":2},\"settled\":{\"factoryDark\":true,\"detected\":true,\"dark\":false,\"reason\":\"declared-dark\",\"imageError\":null,\"video\":false,\"invertCount\":0,\"styleKey\":\"true|\",\"reviewCount\":4}}"
+    "detail": "{\"early\":{\"factoryDark\":false,\"detected\":true,\"dark\":true,\"reason\":\"measured-light\",\"imageError\":null,\"video\":false,\"invertCount\":0,\"styleKey\":\"false|\",\"reviewCount\":2,\"darkReaderFetch\":true,\"darkReaderFetchRequests\":0,\"darkReaderFetchFailures\":0},\"settled\":{\"factoryDark\":true,\"detected\":true,\"dark\":false,\"reason\":\"declared-dark\",\"imageError\":null,\"video\":false,\"invertCount\":0,\"styleKey\":\"true|\",\"reviewCount\":4,\"darkReaderFetch\":true,\"darkReaderFetchRequests\":0,\"darkReaderFetchFailures\":0}}"
   },
   {
     "name": "late theme: the theme layer is off once the site is known to be dark",
     "ok": true,
-    "detail": "{\"factoryDark\":true,\"detected\":true,\"dark\":false,\"reason\":\"declared-dark\",\"imageError\":null,\"video\":false,\"invertCount\":0,\"styleKey\":\"true|\",\"reviewCount\":4}"
+    "detail": "{\"factoryDark\":true,\"detected\":true,\"dark\":false,\"reason\":\"declared-dark\",\"imageError\":null,\"video\":false,\"invertCount\":0,\"styleKey\":\"true|\",\"reviewCount\":4,\"darkReaderFetch\":true,\"darkReaderFetchRequests\":0,\"darkReaderFetchFailures\":0}"
   },
   {
     "name": "late theme: an undeclared theme is found by a second measurement",
     "ok": true,
-    "detail": "{\"factoryDark\":true,\"detected\":true,\"dark\":false,\"reason\":\"measured-dark\",\"imageError\":null,\"video\":false,\"invertCount\":0,\"styleKey\":\"true|\",\"reviewCount\":4}"
+    "detail": "{\"factoryDark\":true,\"detected\":true,\"dark\":false,\"reason\":\"measured-dark\",\"imageError\":null,\"video\":false,\"invertCount\":0,\"styleKey\":\"true|\",\"reviewCount\":4,\"darkReaderFetch\":true,\"darkReaderFetchRequests\":0,\"darkReaderFetchFailures\":0}"
   },
   {
     "name": "observer: unrelated subtree churn does not re-run theme detection",
@@ -257,27 +272,27 @@
   {
     "name": "observer: a root theme attribute change is still detected",
     "ok": true,
-    "detail": "{\"factoryDark\":true,\"detected\":true,\"dark\":false,\"reason\":\"declared-dark\",\"imageError\":null,\"video\":false,\"invertCount\":0,\"styleKey\":\"true|\",\"reviewCount\":6}"
+    "detail": "{\"factoryDark\":true,\"detected\":true,\"dark\":false,\"reason\":\"declared-dark\",\"imageError\":null,\"video\":false,\"invertCount\":0,\"styleKey\":\"true|\",\"reviewCount\":6,\"darkReaderFetch\":true,\"darkReaderFetchRequests\":0,\"darkReaderFetchFailures\":0}"
   },
   {
     "name": "observer: a body theme class change is still detected",
     "ok": true,
-    "detail": "{\"factoryDark\":true,\"detected\":true,\"dark\":false,\"reason\":\"declared-dark\",\"imageError\":null,\"video\":false,\"invertCount\":0,\"styleKey\":\"true|\",\"reviewCount\":6}"
+    "detail": "{\"factoryDark\":true,\"detected\":true,\"dark\":false,\"reason\":\"declared-dark\",\"imageError\":null,\"video\":false,\"invertCount\":0,\"styleKey\":\"true|\",\"reviewCount\":6,\"darkReaderFetch\":true,\"darkReaderFetchRequests\":0,\"darkReaderFetchFailures\":0}"
   },
   {
     "name": "observer: a root data-color-mode light value is detected",
     "ok": true,
-    "detail": "{\"factoryDark\":false,\"detected\":true,\"dark\":true,\"reason\":\"declared-light\",\"imageError\":null,\"video\":false,\"invertCount\":0,\"styleKey\":\"false|\",\"reviewCount\":7}"
+    "detail": "{\"factoryDark\":false,\"detected\":true,\"dark\":true,\"reason\":\"declared-light\",\"imageError\":null,\"video\":false,\"invertCount\":0,\"styleKey\":\"false|\",\"reviewCount\":7,\"darkReaderFetch\":true,\"darkReaderFetchRequests\":0,\"darkReaderFetchFailures\":0}"
   },
   {
     "name": "observer: a dynamically added color-scheme meta is detected",
     "ok": true,
-    "detail": "{\"factoryDark\":true,\"detected\":true,\"dark\":false,\"reason\":\"declared-dark\",\"imageError\":null,\"video\":false,\"invertCount\":0,\"styleKey\":\"true|\",\"reviewCount\":8}"
+    "detail": "{\"factoryDark\":true,\"detected\":true,\"dark\":false,\"reason\":\"declared-dark\",\"imageError\":null,\"video\":false,\"invertCount\":0,\"styleKey\":\"true|\",\"reviewCount\":8,\"darkReaderFetch\":true,\"darkReaderFetchRequests\":0,\"darkReaderFetchFailures\":0}"
   },
   {
     "name": "observer: an empty explicit data-dark flag is detected",
     "ok": true,
-    "detail": "{\"factoryDark\":true,\"detected\":true,\"dark\":false,\"reason\":\"declared-dark\",\"imageError\":null,\"video\":false,\"invertCount\":0,\"styleKey\":\"true|\",\"reviewCount\":8}"
+    "detail": "{\"factoryDark\":true,\"detected\":true,\"dark\":false,\"reason\":\"declared-dark\",\"imageError\":null,\"video\":false,\"invertCount\":0,\"styleKey\":\"true|\",\"reviewCount\":8,\"darkReaderFetch\":true,\"darkReaderFetchRequests\":0,\"darkReaderFetchFailures\":0}"
   },
   {
     "name": "images: photo, diagrams and logo classified separately",
@@ -312,7 +327,7 @@
   {
     "name": "images: a recycled card converts its new source instead of restoring the previous picture",
     "ok": true,
-    "detail": "{\"initial\":\"http://127.0.0.1:60138/images/photo.jpg\",\"updated\":{\"source\":\"http://127.0.0.1:60138/images/banner.png\",\"shown\":true},\"debug\":null}"
+    "detail": "{\"initial\":\"http://127.0.0.1:62643/images/photo.jpg\",\"updated\":{\"source\":\"http://127.0.0.1:62643/images/banner.png\",\"shown\":true},\"debug\":null}"
   },
   {
     "name": "images: stopping after a recycle restores the new original source",
@@ -382,7 +397,7 @@
   {
     "name": "video: forced theme is applied",
     "ok": true,
-    "detail": "{\"factoryDark\":false,\"detected\":true,\"dark\":true,\"reason\":\"measured-light\",\"imageError\":null,\"video\":true,\"invertCount\":0,\"styleKey\":\"false|\",\"reviewCount\":2}"
+    "detail": "{\"factoryDark\":false,\"detected\":true,\"dark\":true,\"reason\":\"measured-light\",\"imageError\":null,\"video\":true,\"invertCount\":0,\"styleKey\":\"false|\",\"reviewCount\":2,\"darkReaderFetch\":true,\"darkReaderFetchRequests\":0,\"darkReaderFetchFailures\":0}"
   },
   {
     "name": "video: an inverted player wrapper does not invert the clip",
@@ -442,7 +457,7 @@
   {
     "name": "site layer follows the switch",
     "ok": true,
-    "detail": "{\"factoryDark\":false,\"detected\":true,\"dark\":false,\"reason\":\"measured-light\",\"imageError\":null,\"video\":false,\"invertCount\":0,\"styleKey\":\"false|\",\"reviewCount\":7}"
+    "detail": "{\"factoryDark\":false,\"detected\":true,\"dark\":false,\"reason\":\"measured-light\",\"imageError\":null,\"video\":false,\"invertCount\":0,\"styleKey\":\"false|\",\"reviewCount\":7,\"darkReaderFetch\":true,\"darkReaderFetchRequests\":0,\"darkReaderFetchFailures\":0}"
   },
   {
     "name": "docs: every skip reason the code can emit is specified",

@@ -18,8 +18,10 @@
   const STRICTLY_LIGHT = /^(only\s+)?light$/;
   const DECLARED_DARK_CLASS = /(^|[\s_-])(dark|darkmode|dark-mode|darktheme|dark-theme|night|nightmode|night-mode|theme-dark|theme-darkmode)([\s_-]|$)/i;
   const DECLARED_LIGHT_CLASS = /(^|[\s_-])(light|lightmode|light-mode|lighttheme|light-theme|theme-light)([\s_-]|$)/i;
-  const DARK_ATTRIBUTES = ['dark', 'dark-mode', 'darkmode', 'dark-theme', 'data-dark', 'night', 'night-mode', 'data-mode', 'data-color-mode', 'data-scheme', 'color-scheme'];
-  const THEME_ATTRIBUTES = ['data-theme', 'theme', 'data-skin', 'data-style'];
+  /* These attributes are explicit dark-mode flags: their presence can be meaningful even without a value. */
+  const DARK_ATTRIBUTES = ['dark', 'dark-mode', 'darkmode', 'dark-theme', 'data-dark', 'night', 'night-mode'];
+  /* These attributes are generic metadata. Only a recognised scheme value is evidence; an empty attribute is neutral. */
+  const THEME_ATTRIBUTES = ['data-theme', 'theme', 'data-skin', 'data-style', 'data-mode', 'data-color-mode', 'data-scheme', 'color-scheme'];
 
   function parseColor(value) {
     if (!value) return null;
@@ -300,7 +302,7 @@
   }
 
   function measure() {
-    if (getComputedStyle(document.documentElement).colorScheme === 'dark') return true;
+    /* color-scheme also controls native widgets; it does not prove that the document's painted surfaces are dark. */
     const result = survey();
     if (!result.total) return !rootFallsBackToLight();
     const share = result.dark / result.total;

@@ -10,6 +10,7 @@
   const COLOR_GRID = 40;
   const COLOR_STEP = 24;
   const MAX_SIDE = 2200;
+  const MAX_CACHE_ENTRIES = 80;
   const IMAGE_TIMEOUT_MS = 10000;
   const VISIBILITY_RETRIES = 4;
   const PREFETCH_MARGIN = '2400px';
@@ -156,44 +157,90 @@
     return canvas;
   }
 
-  async function decodeBlob(blob) {
+  function abortError(signal) {
+    return signal && signal.reason instanceof Error
+      ? signal.reason
+      : new DOMException('Image processing was cancelled', 'AbortError');
+  }
+
+  function throwIfAborted(signal) {
+    if (signal && signal.aborted) throw abortError(signal);
+  }
+
+  async function decodeBlob(blob, signal) {
+    throwIfAborted(signal);
     if (typeof createImageBitmap === 'function') {
       try {
-        return await createImageBitmap(blob);
-      } catch (err) { /* svg and exotic formats are not bitmap-decodable */ }
+        const bitmap = await createImageBitmap(blob);
+        if (signal && signal.aborted) {
+          if (bitmap.close) bitmap.close();
+          throw abortError(signal);
+        }
+        return bitmap;
+      } catch (err) {
+        if (signal && signal.aborted) throw err;
+      }
     }
     return new Promise((resolve, reject) => {
       const img = new Image();
-      img.onload = () => resolve(img);
-      img.onerror = () => reject(new Error('decode-failed'));
-      img.src = URL.createObjectURL(blob);
+      const objectURL = URL.createObjectURL(blob);
+      let settled = false;
+      const cleanup = () => {
+        if (signal) signal.removeEventListener('abort', onAbort);
+        URL.revokeObjectURL(objectURL);
+      };
+      const finish = (callback, value) => {
+        if (settled) return;
+        settled = true;
+        cleanup();
+        callback(value);
+      };
+      const onAbort = () => {
+        img.onload = null;
+        img.onerror = null;
+        img.src = '';
+        finish(reject, abortError(signal));
+      };
+      img.onload = () => finish(resolve, img);
+      img.onerror = () => finish(reject, new Error('decode-failed'));
+      if (signal) signal.addEventListener('abort', onAbort, { once: true });
+      if (signal && signal.aborted) { onAbort(); return; }
+      img.src = objectURL;
     });
   }
 
-  /* A CDN that answers `Access-Control-Allow-Origin: *` rejects any request carrying cookies, so the anonymous
-     attempt comes first and credentials are only added for hosts that need a session. */
-  async function fetchBody(url) {
+  async function fetchBody(url, signal) {
     const attempts = [{ credentials: 'omit' }, { credentials: 'include' }];
     let last = 'fetch-failed';
     for (const options of attempts) {
+      throwIfAborted(signal);
       try {
-        const response = await fetch(url, options);
-        if (!response.ok) { last = `http-${response.status}`; continue; }
+        const response = await fetch(url, { ...options, signal });
+        if (!response.ok) { last = 'http-' + response.status; continue; }
         let blob;
-        try { blob = await response.blob(); } catch (err) { last = 'empty-body'; continue; }
+        try { blob = await response.blob(); } catch (err) {
+          if (signal && signal.aborted) throw err;
+          last = 'empty-body';
+          continue;
+        }
         if (blob && blob.size) return blob;
         last = 'empty-body';
       } catch (err) {
+        if (signal && signal.aborted) throw err;
         last = 'cross-origin';
       }
     }
     throw new Error(last);
   }
 
-  async function loadBitmap(url) {
-    if (url.startsWith('data:')) return decodeBlob(await (await fetch(url)).blob());
-    return decodeBlob(await fetchBody(url));
+  async function loadBitmap(url, signal) {
+    const blob = url.startsWith('data:')
+      ? await (await fetch(url, { signal })).blob()
+      : await fetchBody(url, signal);
+    throwIfAborted(signal);
+    return decodeBlob(blob, signal);
   }
+
 
   /* A picture whose own box never reported a size is judged by the frame it was drawn in. */
   function fallbackBox(img) {
@@ -272,7 +319,9 @@
   function toObjectURL(canvas) {
     return new Promise((resolve) => {
       if (typeof canvas.convertToBlob === 'function') {
-        canvas.convertToBlob({ type: 'image/png' }).then((blob) => resolve(URL.createObjectURL(blob)));
+        canvas.convertToBlob({ type: 'image/png' })
+          .then((blob) => resolve(blob ? URL.createObjectURL(blob) : null))
+          .catch(() => resolve(null));
         return;
       }
       canvas.toBlob((blob) => resolve(blob ? URL.createObjectURL(blob) : null), 'image/png');
@@ -283,9 +332,14 @@
     constructor(selectors) {
       this.selectors = selectors;
       this.cache = new Map();
+      this.entriesByURL = new Map();
+      this.objectURLs = new Set();
       this.handled = new WeakMap();
+      this.controllers = new Set();
+      this.controllersByImage = new WeakMap();
       this.queue = [];
       this.running = 0;
+      this.active = true;
     }
 
     claim(img, url) {
@@ -297,6 +351,11 @@
       if (sources.has(url)) return false;
       sources.add(url);
       return true;
+    }
+
+    unclaim(img, url) {
+      const sources = this.handled.get(img);
+      if (sources) sources.delete(url);
     }
 
     matches(el, list) {
@@ -315,8 +374,6 @@
       return (w >= MIN_WIDTH && h >= MIN_HEIGHT) || w * h >= MIN_AREA;
     }
 
-    /* Faded-out candidates still count: reveal animations start at opacity 0, and waiting for them let the light
-       original show first. A hidden or unlaid-out element is what must be postponed, not a transparent one. */
     isVisible(el) {
       if (!el.getClientRects().length && !fallbackBox(el)) return false;
       const style = getComputedStyle(el);
@@ -324,14 +381,14 @@
     }
 
     enqueue(img) {
-      if (img.dataset.sdDone || img.dataset.sdQueued) return;
+      if (!this.active || !img.isConnected || img.dataset.sdDone || img.dataset.sdQueued) return;
       img.dataset.sdQueued = '1';
       this.queue.push(img);
       this.drain();
     }
 
-    /* A single large picture used to hold the whole queue; a few conversions now run side by side. */
     drain() {
+      if (!this.active) return;
       while (this.running < CONCURRENCY && this.queue.length) {
         this.running++;
         this.run(this.queue.shift()).finally(() => {
@@ -341,32 +398,100 @@
       }
     }
 
-    async run(img) {
-      const timeout = new Promise((resolve) => setTimeout(() => resolve('timeout'), IMAGE_TIMEOUT_MS));
-      ledger.started++;
-      try {
-        const outcome = await Promise.race([this.process(img), timeout]);
-        if (outcome === 'timeout') img.dataset.sdSkip = 'timeout';
-      } catch (err) {
-        img.dataset.sdSkip = err && (err.message || err.name) ? String(err.message || err.name) : 'error';
-      }
-      if (img.dataset.sdDone) {
-        ledger.converted++;
-        ledger.kinds[img.dataset.sdDone] = (ledger.kinds[img.dataset.sdDone] || 0) + 1;
-      } else {
-        ledger.skipped++;
-        const reason = img.dataset.sdSkip || 'unprocessed';
-        ledger.reasons[reason] = (ledger.reasons[reason] || 0) + 1;
-      }
-      publishLedger();
-      delete img.dataset.sdPending;
+    retain(url) {
+      const entry = this.entriesByURL.get(url);
+      if (entry) entry.refs++;
     }
 
-    async process(img) {
-      if (!img.isConnected) return;
+    release(img) {
+      const url = img.dataset.sdBlob;
+      if (!url) return;
+      const entry = this.entriesByURL.get(url);
+      if (entry) entry.refs = Math.max(0, entry.refs - 1);
+      this.pruneCache();
+    }
+
+    pruneCache() {
+      while (this.cache.size > MAX_CACHE_ENTRIES) {
+        let candidate = null;
+        for (const [key, entry] of this.cache) {
+          if (!entry.refs) { candidate = [key, entry]; break; }
+        }
+        if (!candidate) break;
+        const [key, entry] = candidate;
+        this.cache.delete(key);
+        this.entriesByURL.delete(entry.url);
+        this.objectURLs.delete(entry.url);
+        URL.revokeObjectURL(entry.url);
+      }
+    }
+
+    cancelImage(img) {
+      const controller = this.controllersByImage.get(img);
+      if (controller) controller.abort(new DOMException('Image was removed', 'AbortError'));
+    }
+
+    cancel() {
+      if (!this.active) return;
+      this.active = false;
+      this.queue.length = 0;
+      this.controllers.forEach((controller) => controller.abort());
+    }
+
+    dispose() {
+      this.cancel();
+      this.objectURLs.forEach((url) => URL.revokeObjectURL(url));
+      this.objectURLs.clear();
+      this.entriesByURL.clear();
+      this.cache.clear();
+    }
+
+    async run(img) {
+      if (!this.active) return;
+      const controller = new AbortController();
+      this.controllers.add(controller);
+      this.controllersByImage.set(img, controller);
+      let timedOut = false;
+      ledger.started++;
+      const timeoutId = setTimeout(() => {
+        timedOut = true;
+        controller.abort(new DOMException('Image processing timed out', 'TimeoutError'));
+      }, IMAGE_TIMEOUT_MS);
+      try {
+        await this.process(img, controller.signal);
+      } catch (err) {
+        if (this.active && img.isConnected) {
+          img.dataset.sdSkip = timedOut ? 'timeout'
+            : (err && (err.message || err.name) ? String(err.message || err.name) : 'error');
+        }
+      } finally {
+        clearTimeout(timeoutId);
+        this.controllers.delete(controller);
+        if (this.controllersByImage.get(img) === controller) this.controllersByImage.delete(img);
+        if (!this.active) {
+          delete img.dataset.sdPending;
+          return;
+        }
+        if (img.dataset.sdDone) {
+          ledger.converted++;
+          ledger.kinds[img.dataset.sdDone] = (ledger.kinds[img.dataset.sdDone] || 0) + 1;
+        } else {
+          ledger.skipped++;
+          const reason = img.dataset.sdSkip || 'unprocessed';
+          ledger.reasons[reason] = (ledger.reasons[reason] || 0) + 1;
+        }
+        publishLedger();
+        delete img.dataset.sdPending;
+      }
+    }
+
+    async process(img, signal) {
+      if (!this.active || signal.aborted || !img.isConnected) return;
       const url = img.currentSrc || img.src;
-      if (!url || url.startsWith('data:image/svg') || /\.svg(\?|#|$)/i.test(url)) { img.dataset.sdSkip = 'vector'; return; }
-      // Images that fade in or mount late are retried shortly instead of being dropped.
+      if (!url || url.startsWith('data:image/svg') || /\.svg(\?|#|$)/i.test(url)) {
+        img.dataset.sdSkip = 'vector';
+        return;
+      }
       if (!this.isVisible(img)) {
         const attempts = Number(img.dataset.sdAttempts || 0);
         if (attempts >= VISIBILITY_RETRIES) { img.dataset.sdSkip = 'not-visible'; return; }
@@ -378,11 +503,9 @@
       if (!this.isLarge(img) && !fallbackBox(img)) { img.dataset.sdSkip = 'small'; return; }
       if (this.matches(img, this.selectors.ignore)) { img.dataset.sdSkip = 'ignore'; return; }
 
-      // Lazy loaders hand out private object URLs that cannot be fetched again; the element itself is then the source.
       let element = url.startsWith('blob:') ? img : null;
       let frameUrl = url;
       if (!element && img.complete && img.naturalWidth && isPlaceholder(img)) {
-        // The element holds the 1×1 stand-in, so the picture has to be read from the frame the browser will paint.
         const candidates = [...parkedFrames(img), ...pictureFrames(img), ...srcsetFrames(img.getAttribute('srcset'))]
           .map(absolute)
           .filter((candidate) => candidate && candidate !== url && !candidate.startsWith('data:'));
@@ -391,106 +514,135 @@
       } else if (element && isPlaceholder(img)) {
         return { reason: 'placeholder' };
       }
-      if (!this.claim(img, frameUrl)) { if (!img.dataset.sdDone) img.dataset.sdSkip = 'claimed'; return; }
+      if (!this.claim(img, frameUrl)) {
+        if (!img.dataset.sdDone) img.dataset.sdSkip = 'claimed';
+        return;
+      }
 
       const soft = this.matches(img, this.selectors.invert);
-      // Faded out while the replacement is prepared, so a fast scroll never shows the light original.
       img.dataset.sdPending = '1';
-      const key = `${frameUrl}|${soft ? 'soft' : 'auto'}`;
+      const key = frameUrl + '|' + (soft ? 'soft' : 'auto');
       let entry = this.cache.get(key);
-      if (!entry) {
-        entry = await this.build(frameUrl, soft, element);
+      if (entry) {
+        this.cache.delete(key);
         this.cache.set(key, entry);
+      } else {
+        entry = await this.build(frameUrl, soft, element, signal);
+        if (entry && entry.url && this.active && !signal.aborted) {
+          entry.refs = 0;
+          this.cache.set(key, entry);
+          this.entriesByURL.set(entry.url, entry);
+          this.objectURLs.add(entry.url);
+        }
       }
+      throwIfAborted(signal);
+      if (!this.active || !img.isConnected) return;
       if (!entry || !entry.url) {
+        this.unclaim(img, frameUrl);
         img.dataset.sdSkip = (entry && entry.reason) || 'unprocessed';
         return;
       }
 
+      if ((img.currentSrc || img.src) !== url) {
+        this.unclaim(img, frameUrl);
+        delete img.dataset.sdQueued;
+        delete img.dataset.sdPending;
+        this.enqueue(img);
+        return;
+      }
+      captureOriginal(img);
       img.dataset.sdSource = url;
       img.dataset.sdLocked = '1';
-      if (img.srcset) { img.dataset.sdSrcset = img.srcset; img.srcset = ''; }
-      if (img.sizes) img.sizes = '';
+      img.dataset.sdBlob = entry.url;
+      this.retain(entry.url);
+      this.pruneCache();
+      if (img.hasAttribute('srcset')) img.removeAttribute('srcset');
+      if (img.hasAttribute('sizes')) img.removeAttribute('sizes');
       neutralizeSources(img);
       img.dataset.sdDone = entry.kind;
-      img.dataset.sdInfo = `${entry.info.kind}/${entry.info.colors}/${entry.info.midShare.toFixed(2)}/${entry.info.opaque.toFixed(2)}`;
+      img.dataset.sdInfo = entry.info.kind + '/' + entry.info.colors + '/' +
+        entry.info.midShare.toFixed(2) + '/' + entry.info.opaque.toFixed(2);
       img.style.setProperty('filter', 'none', 'important');
-      img.dataset.sdBlob = entry.url;
       img.src = entry.url;
     }
 
-    async build(url, soft, element) {
+    async build(url, soft, element, signal) {
       let bitmap;
       try {
-        bitmap = element || await loadBitmap(url);
+        bitmap = element || await loadBitmap(url, signal);
+        throwIfAborted(signal);
       } catch (err) {
-        // fetchBody names the cause (`http-403`, `empty-body`, `cross-origin`); a decode failure is its own reason.
+        if (signal && signal.aborted) throw err;
         const message = err && err.message ? String(err.message) : '';
         const named = /^(cross-origin|empty-body|http-\d{3}|fetch-failed|decode-failed)$/.test(message);
         return { reason: named ? message : 'decode-failed' };
       }
-      if (isPlaceholder(bitmap)) {
-        // Deliberately unsupported: a real frame of this picture was tried and there is nothing to read.
-        return { kind: 'skip-dark', reason: 'placeholder' };
-      }
-      const naturalW = bitmap.width || bitmap.naturalWidth;
-      const naturalH = bitmap.height || bitmap.naturalHeight;
-      if (!naturalW || !naturalH) return { reason: 'empty' };
 
-      const info = classify(bitmap, naturalW, naturalH);
-      const kind = soft ? 'icon' : info.kind;
-      if (!soft) {
-        const minLight = info.kind === 'icon' ? MIN_LIGHT_SHARE_ICON : MIN_LIGHT_SHARE;
-        if (info.lightShare < minLight) return { kind: 'skip-dark', reason: 'already-dark' };
-        if (info.kind === 'photo' && info.meanLum < SKIP_DARK_PHOTO_BELOW) return { kind: 'skip-dark', reason: 'already-dark' };
-        if (info.kind !== 'photo' && info.meanLum < SKIP_DARK_GRAPHIC_BELOW) return { kind: 'skip-dark', reason: 'already-dark' };
-      }
+      try {
+        if (isPlaceholder(bitmap)) return { reason: 'placeholder' };
+        const naturalW = bitmap.width || bitmap.naturalWidth;
+        const naturalH = bitmap.height || bitmap.naturalHeight;
+        if (!naturalW || !naturalH) return { reason: 'empty' };
 
-      const scale = Math.min(1, MAX_SIDE / Math.max(naturalW, naturalH));
-      const w = Math.max(1, Math.round(naturalW * scale));
-      const h = Math.max(1, Math.round(naturalH * scale));
-      const before = soft ? null : thumbnailStats(bitmap);
-      let finalKind = kind;
-      let canvas = toneMap(bitmap, naturalW, naturalH, finalKind);
-      let dimmed = null;
-      if (!soft) {
-        // A polarity flip turns dark art with bright lettering into a light page with dark lettering — the exact
-        // result the user asked to avoid. A flattening flip (light ink on a dark plate) loses most of its edge
-        // contrast and cannot be read at all. Such a picture is dimmed like a photograph instead.
-        if (finalKind === 'graphic') {
+        const info = classify(bitmap, naturalW, naturalH);
+        const kind = soft ? 'icon' : info.kind;
+        if (!soft) {
+          const minLight = info.kind === 'icon' ? MIN_LIGHT_SHARE_ICON : MIN_LIGHT_SHARE;
+          if (info.lightShare < minLight) return { kind: 'skip-dark', reason: 'already-dark' };
+          if (info.kind === 'photo' && info.meanLum < SKIP_DARK_PHOTO_BELOW) return { kind: 'skip-dark', reason: 'already-dark' };
+          if (info.kind !== 'photo' && info.meanLum < SKIP_DARK_GRAPHIC_BELOW) return { kind: 'skip-dark', reason: 'already-dark' };
+        }
+
+        const scale = Math.min(1, MAX_SIDE / Math.max(naturalW, naturalH));
+        const w = Math.max(1, Math.round(naturalW * scale));
+        const h = Math.max(1, Math.round(naturalH * scale));
+        const before = soft ? null : thumbnailStats(bitmap);
+
+        /* Bound the expensive pixel loop itself: resize the input before tone mapping. */
+        const source = scale < 1 ? this.downscale(bitmap, w, h) : bitmap;
+        throwIfAborted(signal);
+        let finalKind = kind;
+        let canvas = toneMap(source, w, h, finalKind);
+        if (!soft && finalKind === 'graphic') {
           const flipped = thumbnailStats(canvas);
           const lighter = flipped.light - before.light >= FLIP_LIGHT_WORSENS;
           const flattened = flipped.gradient < before.gradient * FLIP_CONTRAST_FLOOR;
           if (lighter || flattened) {
             finalKind = 'dim';
-            dimmed = thumbnailStats(toneMap(bitmap, naturalW, naturalH, 'photo'));
+            const dimmed = thumbnailStats(toneMap(source, w, h, 'photo'));
             if (dimmed.light > before.light + FLIP_LIGHT_WORSENS) {
               return { kind: 'skip-dark', reason: 'already-dark' };
             }
-            canvas = toneMap(bitmap, naturalW, naturalH, 'photo');
+            canvas = toneMap(source, w, h, 'photo');
           }
         }
-        // A flip that keeps almost none of the original edge contrast (a small low-contrast illustration) reads as
-        // a flat plate. Keep the dim instead when the flip destroys detail the eye needs.
-        if (finalKind !== 'dim') {
+        if (!soft && finalKind !== 'dim') {
           const result = thumbnailStats(canvas);
           if (result.gradient < before.gradient * FLIP_CONTRAST_FLOOR) {
             finalKind = 'dim';
-            canvas = toneMap(bitmap, naturalW, naturalH, 'photo');
+            canvas = toneMap(source, w, h, 'photo');
           }
         }
+
+        throwIfAborted(signal);
+        const objectURL = await toObjectURL(canvas);
+        if (!objectURL) return { reason: 'encode-failed' };
+        if (!this.active || (signal && signal.aborted)) {
+          URL.revokeObjectURL(objectURL);
+          return { reason: 'cancelled' };
+        }
+        return { url: objectURL, kind: soft ? 'icon' : (finalKind === 'dim' ? 'dim' : finalKind), info };
+      } finally {
+        if (bitmap && bitmap !== element && typeof bitmap.close === 'function') bitmap.close();
       }
-      const out = scale < 1 ? this.downscale(canvas, w, h) : canvas;
-      const objectURL = await toObjectURL(out);
-      return { url: objectURL, kind: soft ? 'icon' : (finalKind === 'dim' ? 'dim' : finalKind), info };
     }
 
-    downscale(canvas, w, h) {
+    downscale(source, w, h) {
       const target = canvasOf(w, h);
       const ctx = target.getContext('2d');
       ctx.imageSmoothingEnabled = true;
       ctx.imageSmoothingQuality = 'high';
-      ctx.drawImage(canvas, 0, 0, w, h);
+      ctx.drawImage(source, 0, 0, w, h);
       return target;
     }
   }
@@ -499,6 +651,48 @@
      after the swap the browser kept showing the bright original while our dark blob sat unused in `src`. The sources are
      parked in a data attribute (not deleted) so turning images off puts the page back exactly as it was. */
   const SD_PARKED = 'sdSources';
+
+  function captureOriginal(img) {
+    if (img.dataset.sdOriginalCaptured) return;
+    ['src', 'srcset', 'sizes'].forEach((attribute) => {
+      const suffix = attribute[0].toUpperCase() + attribute.slice(1);
+      const value = img.getAttribute(attribute);
+      if (value !== null) {
+        img.dataset['sdHad' + suffix] = '1';
+        img.dataset['sdOriginal' + suffix] = value;
+      }
+    });
+    const filter = img.style.getPropertyValue('filter');
+    if (filter) {
+      img.dataset.sdHadFilter = '1';
+      img.dataset.sdOriginalFilter = filter;
+      img.dataset.sdOriginalFilterPriority = img.style.getPropertyPriority('filter');
+    }
+    img.dataset.sdOriginalCaptured = '1';
+  }
+
+  function restoreOriginal(img) {
+    ['src', 'srcset', 'sizes'].forEach((attribute) => {
+      const suffix = attribute[0].toUpperCase() + attribute.slice(1);
+      if (img.dataset['sdHad' + suffix] === '1') {
+        img.setAttribute(attribute, img.dataset['sdOriginal' + suffix] || '');
+      } else {
+        img.removeAttribute(attribute);
+      }
+      delete img.dataset['sdHad' + suffix];
+      delete img.dataset['sdOriginal' + suffix];
+    });
+    if (img.dataset.sdHadFilter === '1') {
+      img.style.setProperty('filter', img.dataset.sdOriginalFilter || '', img.dataset.sdOriginalFilterPriority || '');
+    } else {
+      img.style.removeProperty('filter');
+    }
+    delete img.dataset.sdHadFilter;
+    delete img.dataset.sdOriginalFilter;
+    delete img.dataset.sdOriginalFilterPriority;
+    delete img.dataset.sdOriginalCaptured;
+  }
+
 
   function parkedOf(img) {
     try {
@@ -537,35 +731,28 @@
     });
   }
 
+  let stopper = null;
+  let activeProcessor = null;
+
   function restore() {
     if (stopper) {
       stopper();
       stopper = null;
     }
-    document.querySelectorAll('img[data-sd-source]').forEach((img) => {
-      const source = img.dataset.sdSource;
-      const srcset = img.dataset.sdSrcset;
+    document.querySelectorAll('img[data-sd-source], img[data-sd-pending], img[data-sd-original-captured]').forEach((img) => {
+      if (activeProcessor) activeProcessor.release(img);
       restoreSources(img);
-      delete img.dataset.sdDone;
-      delete img.dataset.sdInfo;
-      delete img.dataset.sdSkip;
-      delete img.dataset.sdQueued;
-      delete img.dataset.sdTracked;
-      delete img.dataset.sdLocked;
-      delete img.dataset.sdSource;
-      delete img.dataset.sdBlob;
-      delete img.dataset.sdAttempts;
-      delete img.dataset.sdPending;
-      img.style.removeProperty('filter');
-      if (srcset) {
-        img.srcset = srcset;
-        delete img.dataset.sdSrcset;
-      }
-      if (source) img.src = source;
+      if (img.dataset.sdOriginalCaptured) restoreOriginal(img);
+      [
+        'sdDone', 'sdInfo', 'sdSkip', 'sdQueued', 'sdTracked', 'sdLocked',
+        'sdSource', 'sdBlob', 'sdAttempts', 'sdPending', 'sdSrcset',
+      ].forEach((key) => delete img.dataset[key]);
     });
+    if (activeProcessor) {
+      activeProcessor.dispose();
+      activeProcessor = null;
+    }
   }
-
-  let stopper = null;
 
   /* Counters for diagnostics: marker attributes do not survive in-place image swaps, these do. They are mirrored into
      `data-sd-images` on <html> so the page and the tests can read them without touching the isolated world. */
@@ -595,6 +782,7 @@
     if (stopper) return Promise.resolve();
     mountStyle();
     const processor = new Processor(options.selectors);
+    activeProcessor = processor;
     let active = true;
     const seen = new WeakSet();
 
@@ -653,13 +841,36 @@
         const source = img.dataset.sdSource || '';
         const fresh = attr && attr !== img.dataset.sdBlob && attr !== source && !attr.startsWith('blob:');
         if (fresh && !hasLiveSources(img)) {
+          processor.release(img);
+          restoreSources(img);
+          restoreOriginal(img);
+          /* The page supplied a new source while our converted blob was in src. Keep that new source as the
+             original snapshot, so a later stop or another recycle cannot resurrect the previous card's picture. */
+          img.setAttribute('src', attr);
+          captureOriginal(img);
           delete img.dataset.sdLocked;
           delete img.dataset.sdDone;
           delete img.dataset.sdInfo;
           delete img.dataset.sdBlob;
+          delete img.dataset.sdQueued;
+          delete img.dataset.sdSkip;
+          delete img.dataset.sdPending;
           delete img.dataset.sdTracked;
-          restoreSources(img);
-          processor.enqueue(img);
+          const expectedSource = img.getAttribute('src');
+          const enqueueFreshSource = () => {
+            if (!active || !img.isConnected || img.getAttribute('src') !== expectedSource) return;
+            delete img.dataset.sdQueued;
+            processor.enqueue(img);
+          };
+          if (typeof img.decode === 'function') {
+            img.decode().then(enqueueFreshSource, () => {
+              if (img.complete) enqueueFreshSource();
+            });
+          } else if (img.complete && img.naturalWidth) {
+            enqueueFreshSource();
+          } else {
+            img.addEventListener('load', enqueueFreshSource, { once: true });
+          }
           return;
         }
         holdOwn(img);
@@ -675,42 +886,76 @@
       img.dataset.sdTracked = '1';
       processor.enqueue(img);
     };
+    const watchImageSources = (img) => {
+      sourceWatcher.observe(img, { attributes: true, attributeFilter: ['src', 'srcset'] });
+      const picture = img.parentElement && img.parentElement.tagName === 'PICTURE' ? img.parentElement : null;
+      if (picture) picture.querySelectorAll('source').forEach((source) => {
+        sourceWatcher.observe(source, { attributes: true, attributeFilter: ['srcset'] });
+      });
+    };
+
+    const cleanDetachedImages = (root) => {
+      if (!root || root.nodeType !== 1) return;
+      const images = [];
+      if (root.tagName === 'IMG') images.push(root);
+      if (root.querySelectorAll) images.push(...root.querySelectorAll('img'));
+      images.forEach((img) => {
+        if (img.isConnected) return;
+        processor.cancelImage(img);
+        if (img.dataset.sdBlob) processor.release(img);
+        restoreSources(img);
+        if (img.dataset.sdOriginalCaptured) restoreOriginal(img);
+        [
+          'sdDone', 'sdInfo', 'sdSkip', 'sdQueued', 'sdTracked', 'sdLocked',
+          'sdSource', 'sdBlob', 'sdAttempts', 'sdPending', 'sdSrcset',
+        ].forEach((key) => delete img.dataset[key]);
+      });
+    };
+
     const sourceWatcher = new MutationObserver((list) => {
       if (!active) return;
       list.forEach((mutation) => {
-        const img = mutation.target;
-        if (img.tagName === 'IMG') refresh(img);
+        const target = mutation.target;
+        if (target.tagName === 'IMG') refresh(target);
+        else if (target.tagName === 'SOURCE') {
+          const picture = target.parentElement;
+          const img = picture && picture.tagName === 'PICTURE' ? picture.querySelector('img') : null;
+          if (img) refresh(img);
+        }
       });
     });
 
     const mutations = new MutationObserver((list) => {
       if (!active) return;
       for (const mutation of list) {
+        mutation.removedNodes && mutation.removedNodes.forEach(cleanDetachedImages);
         mutation.addedNodes && mutation.addedNodes.forEach((node) => {
           if (node.nodeType !== 1) return;
           if (node.tagName === 'IMG') {
             if (!node.dataset.sdTracked) {
               node.dataset.sdTracked = '1';
-              sourceWatcher.observe(node, { attributes: true, attributeFilter: ['src', 'srcset'] });
+              watchImageSources(node);
               observer.observe(node);
             }
           } else if (node.querySelectorAll) {
             node.querySelectorAll('img').forEach((img) => {
               if (!img.dataset.sdTracked) {
                 img.dataset.sdTracked = '1';
-                sourceWatcher.observe(img, { attributes: true, attributeFilter: ['src', 'srcset'] });
+                watchImageSources(img);
                 observer.observe(img);
               }
             });
+          } else if (node.tagName === 'SOURCE') {
+            sourceWatcher.observe(node, { attributes: true, attributeFilter: ['srcset'] });
           }
         });
       }
     });
 
-    const watchSource = (img) => {
-      sourceWatcher.observe(img, { attributes: true, attributeFilter: ['src', 'srcset'] });
-    };
-    document.querySelectorAll('img').forEach(watchSource);
+    document.querySelectorAll('img').forEach(watchImageSources);
+    document.querySelectorAll('picture > source').forEach((source) => {
+      sourceWatcher.observe(source, { attributes: true, attributeFilter: ['srcset'] });
+    });
 
     track();
     mutations.observe(document.documentElement, { childList: true, subtree: true });
@@ -722,7 +967,7 @@
       observer.disconnect();
       mutations.disconnect();
       sourceWatcher.disconnect();
-      processor.queue.length = 0;
+      processor.cancel();
     };
     return Promise.resolve();
   }

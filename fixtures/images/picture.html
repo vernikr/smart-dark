@@ -15,7 +15,9 @@
     <!-- The <source> wins over img src in a real browser, which used to leave the bright original on screen. -->
     <picture>
       <source srcset="banner.png" type="image/png" media="(min-width: 100px)">
-      <img src="banner.png" alt="Banner in a picture element" data-picture="1">
+      <img src="banner.png" sizes="(max-width: 760px) 100vw, 760px"
+        style="filter: sepia(0.2) !important"
+        alt="Banner in a picture element" data-picture="1">
     </picture>
   </main>
 </body>

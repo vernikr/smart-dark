@@ -11,7 +11,7 @@ import { fileURLToPath } from 'node:url';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const ext = path.join(root, 'dist');
 const fixtures = path.join(root, 'fixtures');
-const shots = path.join(root, 'docs/worklog/2026.11.02-smart-dark-extension/shots');
+const shots = path.join(root, 'docs/worklog/2026.11.07-dom-image-lifecycle/shots');
 fs.mkdirSync(shots, { recursive: true });
 
 const results = [];
@@ -20,21 +20,34 @@ const check = (name, ok, detail = '') => {
   console.log(`${ok ? 'PASS' : 'FAIL'} ${name}${detail ? ' — ' + detail : ''}`);
 };
 
+const skip = (name, detail = '') => {
+  results.push({ name, ok: true, skipped: true, detail });
+  console.log('SKIP ' + name + (detail ? ' — ' + detail : ''));
+};
+
+
 const TYPES = { '.html': 'text/html', '.png': 'image/png', '.jpg': 'image/jpeg', '.svg': 'image/svg+xml' };
 
 let corsPort = 0;
 
 function serve() {
   const server = http.createServer((req, res) => {
-    const clean = decodeURIComponent(req.url.split('?')[0]);
+    const requestUrl = new URL(req.url, 'http://127.0.0.1');
+    const clean = decodeURIComponent(requestUrl.pathname);
     const file = path.join(fixtures, clean.endsWith('/') ? path.join(clean, 'index.html') : clean);
     if (!file.startsWith(fixtures) || !fs.existsSync(file) || fs.statSync(file).isDirectory()) {
       res.writeHead(404).end('not found');
       return;
     }
-    let body = fs.readFileSync(file);
-    if (file.endsWith('.html') && body.includes('__CORS__')) body = body.toString('utf8').replace('__CORS__', String(corsPort));
-    res.writeHead(200, { 'content-type': TYPES[path.extname(file)] || 'application/octet-stream' }).end(body);
+    const send = () => {
+      if (res.destroyed) return;
+      let body = fs.readFileSync(file);
+      if (file.endsWith('.html') && body.includes('__CORS__')) body = body.toString('utf8').replace('__CORS__', String(corsPort));
+      res.writeHead(200, { 'content-type': TYPES[path.extname(file)] || 'application/octet-stream' }).end(body);
+    };
+    const delay = Math.min(3000, Math.max(0, Number(requestUrl.searchParams.get('delay') || 0)));
+    if (delay) setTimeout(send, delay);
+    else send();
   });
   return new Promise((resolve) => server.listen(0, '127.0.0.1', () => resolve(server)));
 }
@@ -114,6 +127,10 @@ async function main() {
   for (const [slug, expected, label] of [
     ['light', false, 'light page'],
     ['simple-page', false, 'short contentful page'],
+    ['neutral-mode', false, 'empty generic mode attributes do not claim a dark theme'],
+    ['light-color-scheme', false, 'color-scheme dark alone does not imply dark painted surfaces'],
+    ['explicit-mode-dark', true, 'an explicit data-mode dark value remains recognised'],
+    ['light-color-mode', false, 'an explicit data-color-mode light value remains recognised'],
     ['inline-important', false, 'email card with important inline background'],
     ['dark-attribute', true, 'data-theme dark page'],
     ['dark-body-class', true, 'body.dark page'],
@@ -128,6 +145,8 @@ async function main() {
     if (slug === 'light') {
       const bg = await page.evaluate(() => getComputedStyle(document.body).backgroundColor);
       check('detection: light page gets the theme without manual action', info && info.dark === true, bg);
+      const fontFamily = await page.evaluate(() => getComputedStyle(document.querySelector('h1')).fontFamily);
+      check('theme: the page font family is preserved', /Georgia/i.test(fontFamily), fontFamily);
       await page.screenshot({ path: path.join(shots, '10-light-fixture.png') });
     }
     if (slug === 'simple-page') {
@@ -192,7 +211,8 @@ async function main() {
     check('live: native dark blog detected', info && info.factoryDark === true, JSON.stringify(info));
     check('live: theme stays off on native dark blog', info && info.dark === false);
   } else {
-    check('live: native dark blog detected', false, 'site unreachable from the sandbox');
+    skip('live: native dark blog detected', 'site unreachable from the sandbox');
+    skip('live: theme stays off on native dark blog', 'site unreachable from the sandbox');
   }
 
   // 2b. a light page reached through a challenge screen must not be read as dark
@@ -311,6 +331,87 @@ async function main() {
   check('late theme: an undeclared theme is found by a second measurement', !!measuredSettled && measuredSettled.dark === false, JSON.stringify(measuredSettled));
   await lateMeasured.close();
 
+  // 3c. unrelated feed churn must not trigger another full-page theme survey.
+  await setStorage({ darkSites: {}, imageSites: {} });
+  const observerPage = await context.newPage();
+  await observerPage.goto(base + '/observer/', { waitUntil: 'load' });
+  await observerPage.waitForTimeout(3800);
+  const reviewBefore = await state(observerPage);
+  await observerPage.evaluate(() => {
+    for (let i = 0; i < 120; i++) {
+      const item = document.createElement('div');
+      item.textContent = 'Feed item ' + i;
+      document.body.appendChild(item);
+      item.remove();
+    }
+  });
+  await observerPage.waitForTimeout(500);
+  const reviewAfter = await state(observerPage);
+  check('observer: unrelated subtree churn does not re-run theme detection',
+    !!reviewBefore && !!reviewAfter && reviewAfter.reviewCount === reviewBefore.reviewCount,
+    JSON.stringify({ before: reviewBefore && reviewBefore.reviewCount, after: reviewAfter && reviewAfter.reviewCount }));
+
+  await observerPage.evaluate(() => document.documentElement.setAttribute('data-theme', 'dark'));
+  const rootTheme = await waitFor(observerPage, () => {
+    const raw = document.documentElement.dataset.sdState;
+    if (!raw) return null;
+    const current = JSON.parse(raw);
+    return current.reason === 'declared-dark' ? current : null;
+  }, 8000);
+  check('observer: a root theme attribute change is still detected', !!rootTheme && rootTheme.dark === false, JSON.stringify(rootTheme));
+
+  await observerPage.evaluate(() => {
+    document.documentElement.removeAttribute('data-theme');
+    document.body.classList.add('dark');
+  });
+  const bodyTheme = await waitFor(observerPage, () => {
+    const raw = document.documentElement.dataset.sdState;
+    if (!raw) return null;
+    const current = JSON.parse(raw);
+    return current.reason === 'declared-dark' ? current : null;
+  }, 8000);
+  check('observer: a body theme class change is still detected', !!bodyTheme && bodyTheme.dark === false, JSON.stringify(bodyTheme));
+  await observerPage.evaluate(() => {
+    document.body.classList.remove('dark');
+    document.documentElement.setAttribute('data-color-mode', 'light');
+  });
+  const bodyLight = await waitFor(observerPage, () => {
+    const raw = document.documentElement.dataset.sdState;
+    if (!raw) return null;
+    const current = JSON.parse(raw);
+    return current.reason === 'declared-light' ? current : null;
+  }, 8000);
+  check('observer: a root data-color-mode light value is detected', !!bodyLight && bodyLight.factoryDark === false, JSON.stringify(bodyLight));
+
+  await observerPage.evaluate(() => {
+    const meta = document.createElement('meta');
+    meta.name = 'color-scheme';
+    meta.content = 'dark';
+    document.head.appendChild(meta);
+  });
+  const metaTheme = await waitFor(observerPage, () => {
+    const raw = document.documentElement.dataset.sdState;
+    if (!raw) return null;
+    const current = JSON.parse(raw);
+    return current.reason === 'declared-dark' ? current : null;
+  }, 8000);
+  check('observer: a dynamically added color-scheme meta is detected', !!metaTheme && metaTheme.factoryDark === true, JSON.stringify(metaTheme));
+
+  await observerPage.evaluate(() => document.querySelector('meta[name="color-scheme"]')?.remove());
+  await observerPage.evaluate(() => {
+    document.documentElement.removeAttribute('data-color-mode');
+    document.body.setAttribute('data-dark', '');
+  });
+  const explicitDark = await waitFor(observerPage, () => {
+    const raw = document.documentElement.dataset.sdState;
+    if (!raw) return null;
+    const current = JSON.parse(raw);
+    return current.reason === 'declared-dark' ? current : null;
+  }, 8000);
+  check('observer: an empty explicit data-dark flag is detected', !!explicitDark && explicitDark.factoryDark === true, JSON.stringify(explicitDark));
+
+  await observerPage.close();
+
   // 4. image classes on the fixture
   await setStorage({ darkSites: {}, imageSites: {} });
   const images = await context.newPage();
@@ -351,6 +452,82 @@ async function main() {
   });
   check('images: an already dark photo is left alone', !!darkSkip && darkSkip.skip === 'already-dark' && !darkSkip.source, JSON.stringify(darkSkip));
 
+  await images.evaluate(async () => {
+    const image = document.createElement('img');
+    image.id = 'recycle-source-check';
+    image.style.cssText = 'display:block;width:700px;height:460px;object-fit:cover';
+    image.src = 'photo.jpg';
+    document.querySelector('main').appendChild(image);
+    image.scrollIntoView();
+  });
+  const recycledInitial = await waitFor(images, () => {
+    const image = document.getElementById('recycle-source-check');
+    return image && image.dataset.sdDone ? image.dataset.sdSource : null;
+  }, 30000);
+  await images.evaluate(() => document.getElementById('recycle-source-check').setAttribute('src', 'banner.png'));
+  const recycledUpdated = await waitFor(images, () => {
+    const image = document.getElementById('recycle-source-check');
+    return image && image.dataset.sdDone && image.dataset.sdSource
+      && image.dataset.sdSource.endsWith('/banner.png')
+      ? { source: image.dataset.sdSource, shown: (image.currentSrc || '').startsWith('blob:') }
+      : null;
+  }, 30000);
+  const recycledDebug = await images.evaluate(() => {
+    const image = document.getElementById('recycle-source-check');
+    return image ? {
+      src: image.getAttribute('src'),
+      currentSrc: image.currentSrc,
+      done: image.dataset.sdDone || '',
+      skip: image.dataset.sdSkip || '',
+      queued: image.dataset.sdQueued || '',
+      pending: image.dataset.sdPending || '',
+      source: image.dataset.sdSource || '',
+      locked: image.dataset.sdLocked || '',
+    } : null;
+  });
+  check('images: a recycled card converts its new source instead of restoring the previous picture',
+    !!recycledInitial && !!recycledUpdated && recycledUpdated.shown,
+    JSON.stringify({ initial: recycledInitial, updated: recycledUpdated, debug: recycledUpdated ? null : recycledDebug }));
+  await setStorage({ darkSites: {}, imageSites: { '127.0.0.1': false } });
+  const recycledRestored = await waitFor(images, () => {
+    const image = document.getElementById('recycle-source-check');
+    return image && !image.dataset.sdDone && image.getAttribute('src') === 'banner.png'
+      ? { src: image.getAttribute('src'), done: image.dataset.sdDone || '' }
+      : null;
+  }, 12000);
+  check('images: stopping after a recycle restores the new original source', !!recycledRestored, JSON.stringify(recycledRestored));
+  await setStorage({ darkSites: {}, imageSites: {} });
+
+  const highResolution = await images.evaluate(async () => {
+    const canvas = document.createElement('canvas');
+    canvas.width = 2800;
+    canvas.height = 1200;
+    const ctx = canvas.getContext('2d');
+    const gradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
+    gradient.addColorStop(0, '#ffffff');
+    gradient.addColorStop(1, '#222222');
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    const image = document.createElement('img');
+    image.id = 'high-resolution-check';
+    image.style.cssText = 'display:block;width:700px;height:auto';
+    image.src = canvas.toDataURL('image/png');
+    document.querySelector('main').appendChild(image);
+    await image.decode();
+    image.scrollIntoView();
+    return { width: image.naturalWidth, height: image.naturalHeight };
+  });
+  const highResolutionResult = await waitFor(images, () => {
+    const image = document.getElementById('high-resolution-check');
+    return image && image.dataset.sdDone
+      ? { kind: image.dataset.sdDone, width: image.naturalWidth, height: image.naturalHeight }
+      : null;
+  }, 30000);
+  check('images: high-resolution input is downscaled before pixel processing',
+    !!highResolutionResult && highResolutionResult.width <= 2200 && highResolutionResult.height <= 2200
+      && highResolutionResult.width === 2200,
+    JSON.stringify({ original: highResolution, output: highResolutionResult }));
+
   // 4a. a CDN that allows any origin but not credentials: the bitmap must still be readable
   const cdnPage = await context.newPage();
   await cdnPage.goto(`${base}/images/cors.html`, { waitUntil: 'load' });
@@ -385,13 +562,27 @@ async function main() {
     const img = document.querySelector('img[data-picture]');
     const source = img.closest('picture').querySelector('source');
     if (source.hasAttribute('srcset')) {
-      return { srcset: true, src: (img.getAttribute('src') || '').replace(location.origin, ''), marker: !!img.dataset.sdSources };
+      return {
+        srcset: true,
+        src: img.getAttribute('src') || '',
+        sizes: img.getAttribute('sizes') || '',
+        filter: img.style.getPropertyValue('filter'),
+        filterPriority: img.style.getPropertyPriority('filter'),
+        marker: !!img.dataset.sdSources,
+      };
     }
     return null;
   }, 15000) || await picPage.evaluate(() => {
     const img = document.querySelector('img[data-picture]');
     const source = img.closest('picture').querySelector('source');
-    return { srcset: source.hasAttribute('srcset'), src: (img.getAttribute('src') || '').replace(location.origin, ''), marker: !!img.dataset.sdSources };
+    return {
+      srcset: source.hasAttribute('srcset'),
+      src: img.getAttribute('src') || '',
+      sizes: img.getAttribute('sizes') || '',
+      filter: img.style.getPropertyValue('filter'),
+      filterPriority: img.style.getPropertyPriority('filter'),
+      marker: !!img.dataset.sdSources,
+    };
   });
   await setStorage({ darkSites: {}, imageSites: {} });
   // A framework re-render puts the original sources back after the swap; the dark frame must win again.
@@ -418,10 +609,42 @@ async function main() {
     return { shown: (img.currentSrc || '').slice(0, 24), srcset: img.getAttribute('srcset'), sources: img.closest('picture').querySelectorAll('source[srcset]').length, parked: img.dataset.sdSources || '', locked: img.dataset.sdLocked || '', done: img.dataset.sdDone || '' };
   }) : null;
   check('images: a re-render that restores srcset does not bring the light original back', !!picFight && picFight.shown === 'blob' && picFight.fought === true, JSON.stringify(picFight || picFightNow));
-  check('images: hide puts the <source srcset> back', picRestored.srcset && picRestored.src === '/images/banner.png' && !picRestored.marker, JSON.stringify(picRestored));
+  check('images: hide restores original <source>, src, sizes and inline filter',
+    picRestored.srcset && picRestored.src === 'banner.png'
+      && picRestored.sizes === '(max-width: 760px) 100vw, 760px'
+      && picRestored.filter === 'sepia(0.2)' && picRestored.filterPriority === 'important'
+      && !picRestored.marker,
+    JSON.stringify(picRestored));
   await picPage.close();
 
-  // 4a3. lazy frames: the stand-in is not the picture, and dark art is not turned inside out
+  // 4a3. stopping image conversion must abort an in-flight fetch and prevent a late image swap.
+  const cancelPage = await context.newPage();
+  await setStorage({ darkSites: {}, imageSites: {} });
+  await cancelPage.goto(base + '/images/cancel.html', { waitUntil: 'domcontentloaded' });
+  const pendingImage = await waitFor(cancelPage, () => {
+    const image = document.querySelector('#cancel-image');
+    return image && image.dataset.sdPending ? true : null;
+  }, 8000);
+  check('images: delayed conversion enters the cancellable pending state', !!pendingImage);
+  await setStorage({ darkSites: {}, imageSites: { '127.0.0.1': false } });
+  await cancelPage.waitForTimeout(2200);
+  const cancelledImage = await cancelPage.evaluate(() => {
+    const image = document.querySelector('#cancel-image');
+    return {
+      done: image.dataset.sdDone || '',
+      pending: image.dataset.sdPending || '',
+      src: image.getAttribute('src') || '',
+      blob: image.dataset.sdBlob || '',
+    };
+  });
+  check('images: stopping conversion prevents a late blob swap',
+    !cancelledImage.done && !cancelledImage.pending
+      && cancelledImage.src.includes('photo.jpg?delay=1800') && !cancelledImage.blob,
+    JSON.stringify(cancelledImage));
+  await cancelPage.close();
+  await setStorage({ darkSites: {}, imageSites: {} });
+
+  // 4a4. lazy frames: the stand-in is not the picture, and dark art is not turned inside out
   const lazy = await context.newPage();
   await lazy.goto(`${base}/images/lazy.html`, { waitUntil: 'load' });
   await scrollThrough(lazy);
@@ -566,7 +789,9 @@ async function main() {
   }
 
   const failed = results.filter((r) => !r.ok);
-  console.log(`\n${results.length - failed.length}/${results.length} checks passed`);
+  const skipped = results.filter((r) => r.skipped).length;
+  const passed = results.length - failed.length - skipped;
+  console.log('\n' + passed + '/' + (results.length - skipped) + ' checks passed; ' + skipped + ' skipped');
   fs.writeFileSync(path.join(shots, 'results.json'), JSON.stringify(results, null, 2));
   process.exit(failed.length ? 1 : 0);
 }

@@ -11,7 +11,7 @@ import { fileURLToPath } from 'node:url';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const ext = path.join(root, 'dist');
 const fixtures = path.join(root, 'fixtures');
-const shots = path.join(root, 'docs/worklog/2026.11.07-dom-image-lifecycle/shots');
+const shots = path.join(root, 'docs/worklog/2026.11.07-site-compatibility/shots');
 fs.mkdirSync(shots, { recursive: true });
 
 const results = [];
@@ -131,6 +131,11 @@ async function main() {
     ['light-color-scheme', false, 'color-scheme dark alone does not imply dark painted surfaces'],
     ['explicit-mode-dark', true, 'an explicit data-mode dark value remains recognised'],
     ['light-color-mode', false, 'an explicit data-color-mode light value remains recognised'],
+    ['mobilism', false, 'phpBB darkrow classes do not declare a dark site'],
+    ['notebook', false, 'Google Devsite class color-scheme--light remains a light site'],
+    ['openai-help', false, 'OpenAI Help Center article is measured as light'],
+    ['npm', false, 'npm package settings page is measured as light'],
+    ['gmail', false, 'Gmail-like mailbox shell is measured as light'],
     ['inline-important', false, 'email card with important inline background'],
     ['dark-attribute', true, 'data-theme dark page'],
     ['dark-body-class', true, 'body.dark page'],
@@ -199,6 +204,142 @@ async function main() {
     if (slug === 'dark-media') {
       await page.screenshot({ path: path.join(shots, '11-dark-hero.png') });
     }
+    await page.close();
+  }
+
+  // 1b. reported site families: theme application, typography and interactive surfaces.
+  for (const [slug, label] of [
+    ['mobilism', 'Mobilism/phpBB'],
+    ['notebook', 'Google Notebook docs'],
+    ['openai-help', 'OpenAI Help'],
+    ['npm', 'npm package settings'],
+    ['gmail', 'Gmail message'],
+  ]) {
+    await setStorage({ darkSites: { '127.0.0.1': true }, imageSites: {} });
+    const page = await context.newPage();
+    await page.goto(base + '/' + slug + '/', { waitUntil: 'load' });
+    const initial = await waitFor(page, () => {
+      const raw = document.documentElement.dataset.sdState;
+      if (!raw) return null;
+      const current = JSON.parse(raw);
+      return current.dark === true ? current : null;
+    }, 12000);
+    check('compatibility: ' + label + ' accepts the explicit dark switch', !!initial, JSON.stringify(initial));
+
+    if (slug === 'mobilism') {
+      const surfaces = await page.evaluate(() => ({
+        body: getComputedStyle(document.body).backgroundColor,
+        header: getComputedStyle(document.querySelector('header')).backgroundColor,
+        row: getComputedStyle(document.querySelector('.darkrow1')).backgroundColor,
+        link: getComputedStyle(document.querySelector('.darkrow1 a')).color,
+      }));
+      check('compatibility: Mobilism-style forum has a dark body and legible forum rows',
+        !!initial && surfaces.body !== 'rgb(243, 243, 243)'
+          && surfaces.row !== 'rgb(244, 244, 244)',
+        JSON.stringify(surfaces));
+    }
+
+    if (slug === 'notebook') {
+      const styles = await page.evaluate(() => ({
+        body: getComputedStyle(document.body).backgroundColor,
+        heading: getComputedStyle(document.querySelector('h1')).fontFamily,
+        header: getComputedStyle(document.querySelector('header')).backgroundColor,
+      }));
+      check('compatibility: Notebook docs darken while retaining Google font declarations',
+        !!initial && styles.body !== 'rgb(255, 255, 255)' && /Google Sans/i.test(styles.heading),
+        JSON.stringify(styles));
+    }
+
+    if (slug === 'openai-help') {
+      const styles = await page.evaluate(() => ({
+        body: getComputedStyle(document.body).backgroundColor,
+        card: getComputedStyle(document.querySelector('.article-card')).backgroundColor,
+        heading: getComputedStyle(document.querySelector('h1')).color,
+      }));
+      check('compatibility: OpenAI Help article surfaces are darkened',
+        !!initial && styles.body !== 'rgb(255, 255, 255)' && styles.card !== 'rgb(255, 255, 255)',
+        JSON.stringify(styles));
+    }
+
+    if (slug === 'npm') {
+      const styles = await page.evaluate(() => ({
+        headerBg: getComputedStyle(document.querySelector('header')).backgroundColor,
+        headerText: getComputedStyle(document.querySelector('header')).color,
+        bodyBg: getComputedStyle(document.querySelector('main')).backgroundColor,
+        packageBg: getComputedStyle(document.querySelector('.package')).backgroundColor,
+        packageText: getComputedStyle(document.querySelector('.package')).color,
+        description: getComputedStyle(document.querySelector('.description')).color,
+      }));
+      const rgb = (value) => value.match(/[\d.]+/g).slice(0, 3).map(Number);
+      const lum = (value) => {
+        const c = rgb(value).map((v) => v / 255).map((v) => v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4);
+        return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
+      };
+      check('compatibility: npm header and package list are consistently dark',
+        !!initial && lum(styles.headerBg) < 0.2 && lum(styles.bodyBg) < 0.2 && lum(styles.packageBg) < 0.35,
+        JSON.stringify(styles));
+      check('compatibility: npm package text remains readable on dark cards',
+        lum(styles.packageText) > lum(styles.packageBg) && lum(styles.description) > lum(styles.packageBg),
+        JSON.stringify(styles));
+    }
+
+    if (slug === 'gmail') {
+      const input = page.locator('input[aria-label="Search mail"]');
+      await setStorage({ darkSites: { '127.0.0.1': false }, imageSites: {} });
+      await waitFor(page, () => {
+        const raw = document.documentElement.dataset.sdState;
+        return raw && JSON.parse(raw).dark === false;
+      }, 8000);
+      await input.focus();
+      const lightFocus = await input.evaluate((element) => ({
+        active: document.activeElement === element,
+        transition: getComputedStyle(element).transitionDuration,
+      }));
+      await setStorage({ darkSites: { '127.0.0.1': true }, imageSites: {} });
+      const darkFocus = await waitFor(page, () => {
+        const element = document.querySelector('input[aria-label="Search mail"]');
+        const background = getComputedStyle(element).backgroundColor;
+        return document.activeElement === element && background !== 'rgb(255, 255, 255)'
+          ? {
+            active: document.activeElement === element,
+            background,
+            color: getComputedStyle(element).color,
+            transition: getComputedStyle(element).transitionDuration,
+            state: JSON.parse(document.documentElement.dataset.sdState || '{}'),
+          } : null;
+      }, 10000);
+      await page.waitForTimeout(220);
+      const banner = await page.locator('.banner td').first().evaluate((element) => ({
+        background: getComputedStyle(element).backgroundColor,
+        color: getComputedStyle(element).color,
+      }));
+      const toLum = (value) => {
+        const m = value.match(/[\d.]+/g).slice(0, 3).map((v) => Number(v) / 255);
+        const c = m.map((v) => v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4);
+        return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
+      };
+      check('compatibility: Gmail search keeps focus through theme activation', !!darkFocus && darkFocus.active,
+        JSON.stringify({ before: lightFocus, after: darkFocus }));
+      check('compatibility: Gmail focused search transition is disabled while dark mode is active',
+        !!darkFocus && darkFocus.transition.split(',').every((value) => value.trim() === '0s'),
+        JSON.stringify(darkFocus));
+      check('compatibility: Gmail focused search field stays dark and readable',
+        !!darkFocus && toLum(darkFocus.background) < 0.25 && toLum(darkFocus.color) > toLum(darkFocus.background),
+        JSON.stringify(darkFocus));
+      check('compatibility: Gmail email banner background and text stay contrasted',
+        toLum(banner.background) < 0.3 && toLum(banner.color) > toLum(banner.background),
+        JSON.stringify(banner));
+      await setStorage({ darkSites: { '127.0.0.1': false }, imageSites: {} });
+      const restoredTransition = await waitFor(page, () => {
+        const element = document.querySelector('input[aria-label="Search mail"]');
+        return getComputedStyle(element).transitionDuration === '0.18s, 0.18s'
+          ? getComputedStyle(element).transitionDuration : null;
+      }, 8000);
+      check('compatibility: Gmail search transition is restored when dark mode is turned off',
+        restoredTransition === '0.18s, 0.18s', String(restoredTransition));
+    }
+
+    await page.screenshot({ path: path.join(shots, 'compat-' + slug + '.png'), fullPage: true });
     await page.close();
   }
 

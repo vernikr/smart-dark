@@ -109,6 +109,11 @@ One dark hero banner or sidebar therefore cannot decide the verdict for the whol
 - **Theme settings** (THEME): brightness/contrast 100, no grayscale or sepia, no forced page font, Dark Reader's
   background/text pairs, system controls themed. The original site typography is preserved.
 
+**Gmail search focus.** While the site layer is enabled, a small compatibility style disables the background transition
+on input with aria-label equal to Search mail. Gmail animates the search field between its resting and focused surfaces;
+changing the page theme during that transition can expose a brief light frame. The rule affects only the Gmail search
+control and is removed when the site layer is disabled.
+
 **Inline-important backgrounds.** Dark Reader can mark an element with data-darkreader-inline-bgcolor while its
 stylesheet conversion still loses to the page's inline background or background-color declaration with important.
 For those marked elements only, the extension temporarily applies Dark Reader's resolved computed background as inline

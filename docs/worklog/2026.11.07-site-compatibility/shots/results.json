@@ -473,5 +473,25 @@
     "name": "docs: the rejection and skip limits are named in the spec",
     "ok": true,
     "detail": "[]"
+  },
+  {
+    "name": "CSP: the declarative MAIN-world proxy is initialized exactly once",
+    "ok": true,
+    "detail": "{\"proxySetupCount\":1}"
+  },
+  {
+    "name": "CSP: no script element is injected into the page for proxy setup",
+    "ok": true,
+    "detail": "0"
+  },
+  {
+    "name": "CSP: dynamically inserted CSSStyleSheet rules are observed and recoloured",
+    "ok": true,
+    "detail": "rgb(24, 26, 27)"
+  },
+  {
+    "name": "CSP: no inline-script CSP violation is emitted",
+    "ok": true,
+    "detail": "[]"
   }
 ]

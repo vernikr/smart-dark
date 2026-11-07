@@ -13,6 +13,7 @@
     darkApplied: false,
     images: false,
     fixes: { invert: [], ignore: [] },
+    reviewCount: 0,
   };
 
   const THEME = {
@@ -21,7 +22,7 @@
     contrast: 100,
     grayscale: 0,
     sepia: 0,
-    useFont: true,
+    useFont: false,
     fontFamily: 'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif',
     textStroke: 0,
     darkSchemeBackgroundColor: '#181a1b',
@@ -241,6 +242,7 @@
       video: !!document.querySelector('video'),
       invertCount: invertSelectors().length,
       styleKey: state.styleKey || null,
+      reviewCount: state.reviewCount,
     });
   }
 
@@ -260,20 +262,54 @@
 
   /* Sites announce their theme late (YouTube sets <html dark> after its first paint), so declared signals always win
      over the measured ones. An unfinished page is not evidence at all: `not-ready` and `skeleton` never decide
-     anything, they only say "ask again". A measured verdict can be revised until the page stops changing — Gmail is an
-     application shell that lays out before its dark surface exists, and a first-paint verdict stuck for the whole
-     session. Once the page survives REVISION_QUIET_MS without DOM changes, the measured verdict is final. */
+     anything, they only say "ask again". A measured verdict can be revised while meaningful theme signals keep
+     changing — Gmail is an application shell that lays out before its dark surface exists. Ordinary feed churn does
+     not keep the verdict open indefinitely; after REVISION_QUIET_MS without a relevant theme change it is final. */
   const REVISION_QUIET_MS = 12000;
   let lastChangeAt = Date.now();
-  let revisionObserver = null;
+  let reviewTimer = null;
+  let reviewFrame = 0;
 
-  function watchForRevision() {
-    if (revisionObserver || typeof MutationObserver !== 'function') return;
-    revisionObserver = new MutationObserver(() => { lastChangeAt = Date.now(); });
-    revisionObserver.observe(document.documentElement, { childList: true, subtree: true, attributes: true, attributeFilter: ['class', 'style', 'data-theme', 'data-mode', 'color-scheme'] });
+  /* A page can produce thousands of mutations while rendering a feed. Theme detection is expensive, so only
+     meaningful theme changes schedule it, and bursts are collapsed into one delayed render. */
+  function scheduleThemeReview(delay = 160) {
+    if (reviewTimer) clearTimeout(reviewTimer);
+    reviewTimer = setTimeout(() => {
+      reviewTimer = null;
+      if (reviewFrame) return;
+      const run = () => {
+        reviewFrame = 0;
+        render();
+      };
+      if (typeof requestAnimationFrame === 'function') reviewFrame = requestAnimationFrame(run);
+      else run();
+    }, delay);
+  }
+
+  function markThemeChanged(delay = 160) {
+    lastChangeAt = Date.now();
+    scheduleThemeReview(delay);
+  }
+
+  function isElement(node) {
+    return !!node && node.nodeType === Node.ELEMENT_NODE;
+  }
+
+  function hasRelevantNode(node, selector) {
+    if (!isElement(node)) return false;
+    return node.matches(selector) || !!(node.querySelector && node.querySelector(selector));
+  }
+
+  function isOwnedStyle(node) {
+    if (!node) return false;
+    const element = node.nodeType === Node.ELEMENT_NODE ? node : node.parentElement;
+    if (!element) return false;
+    const style = element.closest && element.closest('style.darkreader, #smart-dark-images');
+    return !!style || !!(element.matches && element.matches('style.darkreader, #smart-dark-images'));
   }
 
   function detect() {
+    state.reviewCount++;
     const result = window.WDDetect.detect();
     if (result.reason === 'no-body') return result.dark;
     const declared = result.reason.indexOf('declared-') === 0;
@@ -380,7 +416,6 @@
 
   function boot() {
     loadFixes().then(() => {
-      watchForRevision();
       render();
       const settle = () => render().then(() => {
         setTimeout(() => render(), 400);
@@ -388,19 +423,115 @@
         setTimeout(() => render(), 3000);
       });
       const watchAnnouncements = () => {
-        const seen = { scheme: state.reason, video: !!document.querySelector('video') };
-        const review = () => {
-          const scheme = window.WDDetect.detect().reason;
-          const video = !!document.querySelector('video');
-          if (scheme === seen.scheme && video === seen.video) return;
-          seen.scheme = scheme;
-          seen.video = video;
-          render();
+        const attributes = [
+          'class', 'style', 'dark', 'dark-mode', 'darkmode', 'dark-theme', 'data-dark', 'night', 'night-mode',
+          'data-theme', 'theme', 'data-skin', 'data-style', 'data-mode', 'data-color-mode', 'data-scheme', 'color-scheme',
+        ];
+        const themeAttributes = new MutationObserver(() => markThemeChanged(80));
+        [document.documentElement, document.body].forEach((element) => {
+          if (element) themeAttributes.observe(element, { attributes: true, attributeFilter: attributes });
+        });
+
+        const styleChanged = (records) => {
+          const relevant = records.some((record) => {
+            if (record.type === 'attributes') {
+              const target = record.target;
+              const themeMeta = target.matches && target.matches('meta[name="color-scheme"]');
+              return themeMeta || (
+                hasRelevantNode(target, 'style, link[rel~="stylesheet"]') && !isOwnedStyle(target)
+              );
+            }
+            const target = record.target;
+            const element = isElement(target) ? target : target && target.parentElement;
+            if (element && element.tagName === 'STYLE' && !isOwnedStyle(element)) return true;
+            return [...record.addedNodes, ...record.removedNodes]
+              .some((node) => (
+                hasRelevantNode(node, 'style, link[rel~="stylesheet"], meta[name="color-scheme"]') &&
+                !isOwnedStyle(node)
+              ));
+          });
+          if (relevant) markThemeChanged(180);
         };
-        const observer = new MutationObserver(review);
-        const options = { attributes: true, attributeFilter: ['class', 'dark', 'data-theme', 'data-mode', 'data-color-mode', 'data-scheme'] };
-        [document.documentElement, document.body].forEach((element) => element && observer.observe(element, options));
-        observer.observe(document.documentElement, { childList: true, subtree: true });
+
+        if (document.head) {
+          const headObserver = new MutationObserver(styleChanged);
+          headObserver.observe(document.head, {
+            attributes: true,
+            attributeFilter: ['href', 'disabled', 'media', 'name', 'content'],
+            childList: true,
+            subtree: true,
+            characterData: true,
+          });
+          document.head.addEventListener('load', (event) => {
+            if (event.target && event.target.matches && event.target.matches('link[rel~="stylesheet"]')) {
+              markThemeChanged(120);
+            }
+          }, true);
+        }
+
+        let hasVideo = !!document.querySelector('video');
+        const darkFlags = new Set([
+          'dark', 'dark-mode', 'darkmode', 'dark-theme', 'data-dark', 'night', 'night-mode',
+        ]);
+        const themeAttributeNames = new Set([
+          'data-theme', 'theme', 'data-skin', 'data-style', 'data-mode', 'data-color-mode',
+          'data-scheme', 'color-scheme',
+        ]);
+        const contentObserver = new MutationObserver((records) => {
+          let videoChanged = false;
+          let stylesheetChanged = false;
+          let declaredThemeChanged = false;
+          for (const record of records) {
+            if (record.type === 'attributes') {
+              const target = record.target;
+              const value = record.attributeName === 'class'
+                ? String(target.className || '')
+                : target.getAttribute(record.attributeName) || '';
+              if (record.attributeName === 'style') {
+                if (/background|color-scheme/i.test(value)) declaredThemeChanged = true;
+              } else if (record.attributeName === 'class') {
+                if (/(^|[\s_-])(dark|darkmode|dark-mode|darktheme|dark-theme|night|nightmode|night-mode|theme-dark|theme-darkmode|light|lightmode|light-mode|lighttheme|light-theme|theme-light)([\s_-]|$)/i.test(value)) {
+                  declaredThemeChanged = true;
+                }
+              } else if (darkFlags.has(record.attributeName)) {
+                declaredThemeChanged = target.hasAttribute(record.attributeName) &&
+                  (!value.trim() || /^(true|1|dark|night)$/i.test(value.trim()));
+              } else if (themeAttributeNames.has(record.attributeName)) {
+                declaredThemeChanged = /^(only\s+)?(dark|night|light)$/i.test(value.trim());
+              }
+              continue;
+            }
+            for (const node of [...record.addedNodes, ...record.removedNodes]) {
+              if (!isElement(node)) continue;
+              if (!videoChanged && hasRelevantNode(node, 'video')) {
+                const current = !!document.querySelector('video');
+                if (current !== hasVideo) {
+                  hasVideo = current;
+                  videoChanged = true;
+                }
+              }
+              if (!stylesheetChanged && hasRelevantNode(node, 'style, link[rel~="stylesheet"]') && !isOwnedStyle(node)) {
+                stylesheetChanged = true;
+              }
+              if (videoChanged && stylesheetChanged) break;
+            }
+            if (videoChanged && stylesheetChanged) break;
+          }
+          if (videoChanged) scheduleThemeReview(80);
+          if (stylesheetChanged) markThemeChanged(180);
+          if (declaredThemeChanged) markThemeChanged(100);
+        });
+        if (document.body) {
+          contentObserver.observe(document.body, {
+            childList: true,
+            subtree: true,
+            attributes: true,
+            attributeFilter: [
+              'class', 'style', 'dark', 'dark-mode', 'darkmode', 'dark-theme', 'data-dark', 'night', 'night-mode',
+              'data-theme', 'theme', 'data-skin', 'data-style', 'data-mode', 'data-color-mode', 'data-scheme', 'color-scheme',
+            ],
+          });
+        }
       };
       if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => { settle(); watchAnnouncements(); }, { once: true });
       else { settle(); watchAnnouncements(); }

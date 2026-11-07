@@ -44,7 +44,16 @@ function serve() {
       if (res.destroyed) return;
       let body = fs.readFileSync(file);
       if (file.endsWith('.html') && body.includes('__CORS__')) body = body.toString('utf8').replace('__CORS__', String(corsPort));
-      res.writeHead(200, { 'content-type': TYPES[path.extname(file)] || 'application/octet-stream' }).end(body);
+      const headers = { 'content-type': TYPES[path.extname(file)] || 'application/octet-stream' };
+      if (requestUrl.pathname === '/strict-csp/' || requestUrl.pathname === '/strict-csp/index.html') {
+        headers['content-security-policy'] = [
+          "default-src 'self'",
+          "img-src 'self' data: blob:",
+          "style-src 'self' 'unsafe-inline'",
+          "script-src 'self'",
+        ].join('; ');
+      }
+      res.writeHead(200, headers).end(body);
     };
     const delay = Math.min(3000, Math.max(0, Number(requestUrl.searchParams.get('delay') || 0)));
     if (delay) setTimeout(send, delay);
@@ -140,6 +149,47 @@ async function main() {
   await warmup.reload({ waitUntil: 'load' });
   await waitFor(warmup, () => document.documentElement.dataset.sdState !== undefined, 8000);
   await warmup.close();
+
+  // 0b. Strict CSP must not block the declaratively injected MAIN-world proxy.
+  await setStorage({ darkSites: {}, imageSites: {} });
+  const cspPage = await context.newPage();
+  const cspErrors = [];
+  cspPage.on('console', (message) => {
+    if (message.type() === 'error') cspErrors.push(message.text());
+  });
+  await cspPage.addInitScript(() => {
+    document.addEventListener('__darkreader__inlineScriptsAllowed', () => {
+      const count = Number(document.documentElement.dataset.sdProxySetupCount || 0) + 1;
+      document.documentElement.dataset.sdProxySetupCount = String(count);
+      document.documentElement.dataset.sdProxyReady = 'true';
+    });
+  });
+  await cspPage.goto(base + '/strict-csp/', { waitUntil: 'load' });
+  const cspState = await waitFor(cspPage, () => {
+    const raw = document.documentElement.dataset.sdState;
+    return raw ? JSON.parse(raw) : null;
+  }, 10000);
+  const proxyReady = await waitFor(cspPage, () => document.documentElement.dataset.sdProxyReady === 'true', 10000);
+  await cspPage.evaluate(() => {
+    document.querySelector('#late-styles').sheet.insertRule('.late-style-target { background-color: #fff; color: #111; }');
+  });
+  const lateStyle = await waitFor(cspPage, () => {
+    const target = document.querySelector('.late-style-target');
+    if (!target) return null;
+    const background = getComputedStyle(target).backgroundColor;
+    return background !== 'rgb(255, 255, 255)' ? background : null;
+  }, 10000);
+  const proxySetupCount = await cspPage.evaluate(() => Number(document.documentElement.dataset.sdProxySetupCount || 0));
+  const injectedProxyTags = await cspPage.locator('script.darkreader--proxy').count();
+  check('CSP: the declarative MAIN-world proxy is initialized exactly once', proxyReady && proxySetupCount === 1,
+    JSON.stringify({ proxySetupCount, cspState }));
+  check('CSP: no script element is injected into the page for proxy setup', injectedProxyTags === 0, String(injectedProxyTags));
+  check('CSP: dynamically inserted CSSStyleSheet rules are observed and recoloured', !!lateStyle, String(lateStyle));
+  check('CSP: no inline-script CSP violation is emitted',
+    !cspErrors.some((message) => /Executing inline script violates|Refused to execute inline script/i.test(message)),
+    JSON.stringify(cspErrors.filter((message) => /Content Security Policy|inline script/i.test(message))));
+  await cspPage.screenshot({ path: path.join(shots, 'compat-strict-csp.png'), fullPage: true });
+  await cspPage.close();
 
   // 1. factory dark detection on well-known variants
   for (const [slug, expected, label] of [

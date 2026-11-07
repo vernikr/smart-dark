@@ -22,11 +22,11 @@ Base: main (PR #3 was merged before this follow-up)
 The local compatibility fixtures cover phpBB/Mobilism row classes, Google Devsite typography, OpenAI Help article surfaces, npm settings header/cards, and Gmail focused search plus inline-important email banner. The service-worker bridge has direct tests for cross-origin image retrieval, cookie omission, and the streaming size limit. Screenshots and machine-readable results are stored in shots.
 
 - npm run build — passed.
-- npm test — 95/95 checks passed, 0 skipped.
+- npm test — 99/99 checks passed, 0 skipped (including four strict-CSP proxy checks).
 - The live Kiro page used the new service-worker bridge for one cross-origin resource request; no fetch failures were recorded.
 - node --check — passed for all changed JavaScript files.
 - git diff --check — passed.
 
 The local live-site smoke test was run in an isolated Chromium profile. Notebook and Meduza received the dark theme. npm and Mobilism were shown Cloudflare verification pages; OpenAI Help also served a verification shell; the unsigned Gmail session redirected to Google sign-in. These four pages could not be evaluated in their authenticated/live state by this isolated profile. The main Chrome visual pass was obstructed by a macOS screen-recording permission dialog; its screenshots were therefore not used as authoritative visual evidence.
 
-Chrome's extension error view showed Dark Reader's optional inline proxy being blocked by strict script-src CSP on at least one page. Its stylesheet watcher falls back to polling while theme styles remain active. Automatic detection of this browser-generated violation was not reliable from the isolated content-script context, so no global proxy-disable workaround was added.
+The final fix packages Dark Reader's upstream MAIN-world proxy as a separate declarative content script at document_start. It is triggered through a DOM event from the isolated runtime, so the page never receives an injected inline script or external extension-origin script tag. A strict CSP fixture with script-src 'self' verifies that the proxy initializes exactly once, dynamically inserted CSSStyleSheet rules are recoloured, no proxy script element is inserted, and no inline-script violation is emitted.

@@ -107,8 +107,45 @@ function buildDarkReader() {
   const requireFromRoot = createRequire(path.join(root, 'package.json'));
   const entry = requireFromRoot.resolve('darkreader');
   const file = entry.endsWith('.mjs') ? path.join(path.dirname(entry), 'darkreader.js') : entry;
-  copy(file, path.join(dist, 'lib/darkreader.js'));
-  log('darkreader runtime copied');
+  let runtime = fs.readFileSync(file, 'utf8').replace(/\r\n/g, '\n');
+
+  // Strict site CSPs block Dark Reader's inline MAIN-world proxy. Run the upstream proxy
+  // as a declarative MAIN-world content script instead; browser injection is not a page script.
+  const proxyStart = runtime.indexOf('    function injectProxy(');
+  const proxyEnd = runtime.indexOf('    const definedCustomElements = new Set();', proxyStart);
+  if (proxyStart < 0 || proxyEnd < 0) {
+    throw new Error('could not locate Dark Reader injectProxy() for CSP-compatible packaging');
+  }
+  const proxyFunction = runtime.slice(proxyStart, proxyEnd).trim();
+  const newline = String.fromCharCode(10);
+  const proxyResource = [
+    '(() => {',
+    '  const setupEvent = "__darkreader__setupProxy";',
+    proxyFunction,
+    '  document.addEventListener(setupEvent, (event) => {',
+    '    const flags = String(event.detail || "");',
+    '    if (!/^[01]{2}$/.test(flags)) return;',
+    '    injectProxy(flags.charAt(0) === "1", flags.charAt(1) === "1");',
+    '  }, true);',
+    '})();',
+    '',
+  ].join(newline);
+  fs.writeFileSync(path.join(dist, 'darkreader-proxy-main.js'), proxyResource);
+
+  const proxyBlockStart = runtime.indexOf('        {' + newline + '            const proxyScript = createOrUpdateScript("darkreader--proxy");');
+  const proxyBlockEndMarker = '            proxyScript.remove();' + newline + '        }';
+  const proxyBlockEnd = runtime.indexOf(proxyBlockEndMarker, proxyBlockStart);
+  if (proxyBlockStart < 0 || proxyBlockEnd < 0) {
+    throw new Error('could not locate Dark Reader MAIN-world proxy injection block for CSP-compatible packaging');
+  }
+  runtime = runtime.slice(0, proxyBlockStart) + [
+    '        document.dispatchEvent(new CustomEvent("__darkreader__setupProxy", {',
+    '            detail: (enableStyleSheetsProxy ? "1" : "0") + (enableCustomElementRegistryProxy ? "1" : "0")',
+    '        }));',
+  ].join(newline) + runtime.slice(proxyBlockEnd + proxyBlockEndMarker.length);
+  fs.mkdirSync(path.join(dist, 'lib'), { recursive: true });
+  fs.writeFileSync(path.join(dist, 'lib/darkreader.js'), runtime);
+  log('darkreader runtime copied with declarative MAIN-world proxy');
 }
 
 function buildManifest() {
